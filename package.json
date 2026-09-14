@@ -1,0 +1,15 @@
+{
+  "name": "usage-pill",
+  "version": "0.1.0",
+  "description": "Minimal always-on-top desktop overlay showing real-time Claude Code / Codex usage",
+  "main": "src/main/index.js",
+  "license": "MIT",
+  "author": "Muhammad Rayyan",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/parsers.test.js test/activityLog.test.js test/config.test.js test/reduce.test.js"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0"
+  }
+}

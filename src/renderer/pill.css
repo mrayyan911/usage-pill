@@ -1,0 +1,241 @@
+html, body {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  -webkit-user-drag: none;
+}
+
+body {
+  /* Fixed Dynamic-Island-style position -- the window itself is not
+     draggable (movable:false in window.js), so no app-region:drag here. */
+  user-select: none;
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+}
+
+/* Spring-style easing used everywhere the pill "grows" -- a slight
+   overshoot reads as alive rather than robotic. */
+:root {
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pill {
+  position: relative;
+  box-sizing: border-box;
+  width: 240px;
+  margin-top: 2px;
+  border-radius: 18px;
+  animation: pillAppear 0.2s var(--spring) both;
+  transition: width 0.42s var(--spring), border-radius 0.42s var(--spring);
+}
+
+.pill.expanded {
+  width: 260px;
+  border-radius: 20px;
+}
+
+/* Outer ambient glow, tinted by the active agent's color. Must sit behind
+   .pill-inner and only bleed past its edges -- an inner glow would wash
+   over pill-inner's own background. Positioned boxes paint above
+   non-positioned in-flow ones regardless of source order, so pill-inner
+   needs its own explicit stacking (below) to actually occlude this. */
+.pill::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit; /* always matches .pill's own radius -- compact or expanded */
+  background: var(--agent-color, #d97757);
+  filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+}
+
+.pill.working::before {
+  animation: workingGlow 1.8s ease-in-out infinite;
+}
+
+@keyframes workingGlow {
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.32; }
+}
+
+/* Danger-threshold border pulse, done as an opacity-only pseudo-element so
+   the continuous animation never touches box-shadow/border on the real
+   element (that would force per-frame raster of the transparent surface). */
+.pill::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 2px solid #e5484d;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2; /* stays above pill-inner -- this one IS meant to overlay the card */
+}
+.pill.danger::after {
+  animation: borderPulseOpacity 2s ease-in-out infinite;
+}
+
+@keyframes pillAppear {
+  from { opacity: 0; transform: scale(0.9) translateY(-6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes borderPulseOpacity {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.65; }
+}
+
+/* The actual clipped/rounded surface. Grid-row morph is what makes the
+   detail row grow in place ("dynamic island" expand) instead of a separate
+   floating tooltip -- 0fr collapses it to nothing, 1fr reveals it at its
+   natural content height, and the fr-value transition animates smoothly. */
+.pill-inner {
+  position: relative; /* required for z-index to take effect */
+  z-index: 1; /* paints above .pill::before so its opaque background actually occludes the glow, which then only shows in the -6px bleed past this box's edges */
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: 36px 0fr;
+  border-radius: inherit;
+  overflow: hidden;
+  background: rgba(14, 14, 16, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: grid-template-rows 0.42s var(--spring);
+}
+
+.pill.expanded .pill-inner {
+  grid-template-rows: 36px 1fr;
+}
+
+.pill-row {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+}
+
+.icon-wrap {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  transform-origin: center;
+  will-change: transform;
+  opacity: 1;
+  transition: opacity 0.26s ease, color 0.26s ease, transform 0.26s ease;
+}
+
+.icon svg {
+  display: block;
+  width: 16px;
+  height: 14px;
+  image-rendering: pixelated;
+}
+
+.icon.idle {
+  opacity: 0.55;
+}
+
+/* 0.56s = 4 walk-cycle frames at 140ms each (see GLYPH_INTERVAL_MS in
+   pill.js) -- the bounce peak lands on the same beat as each footstep. */
+.icon.working {
+  animation: iconBounce 0.56s var(--spring) infinite;
+}
+
+.icon.switching {
+  opacity: 0;
+  transform: translateX(-4px);
+}
+
+@keyframes iconBounce {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  40% { transform: translateY(-3px) scale(1.05, 0.95); }
+  70% { transform: translateY(0.5px) scale(0.97, 1.03); }
+}
+
+.bar-track {
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  border-radius: 2px;
+  transform-origin: left center;
+  transform: scaleX(0); /* animate scaleX, never width -- compositor-only */
+  will-change: transform;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+}
+
+.bar-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  opacity: 0;
+  transform: translateX(-120%);
+  will-change: transform, opacity;
+}
+
+.bar-shimmer.active {
+  opacity: 1;
+  animation: shimmerSweep 1.8s linear infinite;
+}
+
+@keyframes shimmerSweep {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(220%); }
+}
+
+.percent {
+  flex: 0 0 auto;
+  min-width: 2.4em;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.detail-row {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+}
+
+.detail {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease 0.14s;
+}
+
+.pill.expanded .detail {
+  opacity: 1;
+}

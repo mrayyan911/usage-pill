@@ -1,0 +1,5 @@
+{"agent":"claude","ev":"start","ts":"2026-09-14T08:00:00.000Z","session_id":"s1"}
+{"agent":"claude","ev":"subagent_start","ts":"2026-09-14T08:00:01.000Z","session_id":"s1"}
+{"agent":"claude","ev":"subagent_stop","ts":"2026-09-14T08:00:05.000Z","session_id":"s1"}
+{"agent":"claude","ev":"end","ts":"2026-09-14T08:00:06.000Z","session_id":"s1"}
+{"agent":"claude","ev":"start","ts":"2026-09-14T08:01:00.000Z","session_id":"s2"}
