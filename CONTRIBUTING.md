@@ -13,6 +13,33 @@ npm start                    # real data (reads live Claude/Codex usage)
 state change to the terminal — the fastest way to see what the reducer is
 doing without staring at the pill itself.
 
+## Branching
+
+Branch off `main` using `<type>/<short-kebab-case-description>`:
+
+| Type       | Use for                                      | Example                          |
+|------------|-----------------------------------------------|-----------------------------------|
+| `feat/`    | New behavior or UI                            | `feat/hover-expand-transitions`   |
+| `fix/`     | Bug fixes                                     | `fix/pill-corner-radius`          |
+| `chore/`   | Tooling, deps, config, no behavior change     | `chore/bump-electron`             |
+| `docs/`    | Documentation only                            | `docs/contributing-branch-style`  |
+| `refactor/`| Internal restructuring, no behavior change    | `refactor/reducer-state-shape`    |
+| `test/`    | Test-only changes                             | `test/codex-rollout-fixtures`     |
+
+Guidelines:
+
+- One logical change per branch — if a PR description needs "and" to
+  summarize it, it's two branches.
+- Keep branches short-lived: rebase onto `main` rather than merging `main`
+  into your branch, so history stays linear and easy to bisect.
+- Delete the branch once it's merged.
+- Commit messages follow the same intent as the branch type where it makes
+  sense (`fix: correct pill corner radius on expand`), imperative mood,
+  no trailing period on the subject line.
+- PRs merge via **squash and merge** on GitHub — commit hygiene on the
+  branch itself doesn't need to be pristine, but the squashed message
+  landing on `main` does.
+
 ## Before opening a PR
 
 - `npm test` passes.
