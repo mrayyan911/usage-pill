@@ -62,6 +62,10 @@ tailing the newest rollout file, which already gets scanned for usage.
   Everything underneath was verified programmatically; only run `npm start`
   yourself to confirm the last mile.
 
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).
