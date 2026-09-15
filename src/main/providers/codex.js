@@ -4,8 +4,9 @@ const os = require('node:os');
 const path = require('node:path');
 const fs = require('node:fs');
 
-const { readTail } = require('../fsUtil');
+const { readTail, statOrNull } = require('../fsUtil');
 const { parseCodexRollout } = require('../parsers/codexRollout');
+const { EMPTY_USAGE } = require('../usageShape');
 
 const SESSIONS_ROOT = path.join(os.homedir(), '.codex', 'sessions');
 
@@ -45,14 +46,6 @@ function allRolloutFilesToday() {
   return files;
 }
 
-function statMtime(filePath) {
-  try {
-    return fs.statSync(filePath).mtimeMs;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Single backward-scan-friendly pass over all of today's (+ yesterday's)
  * rollout files, newest-first, yielding BOTH usage and activity from one
@@ -75,11 +68,11 @@ function statMtime(filePath) {
  */
 function readCodexSnapshot() {
   const files = allRolloutFilesToday()
-    .map((filePath) => ({ filePath, mtimeMs: statMtime(filePath) }))
+    .map((filePath) => ({ filePath, mtimeMs: statOrNull(filePath)?.mtimeMs ?? null }))
     .filter((f) => f.mtimeMs != null)
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
 
-  let usage = { percent: null, resetsAt: null, weeklyPercent: null, planType: null, status: 'error' };
+  let usage = { ...EMPTY_USAGE, status: 'error' };
   let activity = 'unknown';
   let newestMtimeMs = files.length > 0 ? files[0].mtimeMs : null;
   let usageFound = false;

@@ -2,14 +2,13 @@
 
 const { fetchClaudeUsage } = require('../providers/claude');
 const { readCodexSnapshot } = require('../providers/codex');
+const { EMPTY_USAGE } = require('../usageShape');
 
 const CLAUDE_POLL_MS = 60_000;
 const CLAUDE_EDGE_DEBOUNCE_MS = 5_000;
 const HTTP_ERROR_BACKOFF_START_MS = 60_000;
 const HTTP_ERROR_BACKOFF_MAX_MS = 120_000;
 const STALE_AFTER_MS = 3 * 60_000;
-
-const EMPTY_USAGE = { percent: null, resetsAt: null, weeklyPercent: null, planType: null };
 
 /**
  * Owns the Claude 5-hour usage percentage (fetched over HTTP) and the

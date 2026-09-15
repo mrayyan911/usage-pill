@@ -133,6 +133,7 @@ body {
   justify-content: center;
   font-size: 14px;
   line-height: 1;
+  color: var(--agent-color, #d97757);
   transform-origin: center;
   will-change: transform;
   opacity: 1;
@@ -183,10 +184,22 @@ body {
   height: 100%;
   width: 100%;
   border-radius: 2px;
+  background-color: var(--agent-color, #d97757);
   transform-origin: left center;
   transform: scaleX(0); /* animate scaleX, never width -- compositor-only */
   will-change: transform;
   transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+}
+
+/* Threshold colors take priority over the agent color -- class specificity
+   (two classes vs. one) wins over source order, so these apply regardless
+   of where they sit in the file. */
+.bar-fill.amber {
+  background-color: #e8a33d;
+}
+
+.bar-fill.red {
+  background-color: #e5484d;
 }
 
 .bar-shimmer {

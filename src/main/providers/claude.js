@@ -5,6 +5,8 @@ const path = require('node:path');
 const os = require('node:os');
 const https = require('node:https');
 
+const { EMPTY_USAGE } = require('../usageShape');
+
 const CREDENTIALS_PATH = path.join(os.homedir(), '.claude', '.credentials.json');
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
 
@@ -62,28 +64,28 @@ function requestUsage(token) {
 async function fetchClaudeUsage() {
   const token = readAccessToken();
   if (!token) {
-    return { percent: null, resetsAt: null, weeklyPercent: null, planType: null, status: 'unauthenticated' };
+    return { ...EMPTY_USAGE, status: 'unauthenticated' };
   }
 
   let response;
   try {
     response = await requestUsage(token);
   } catch {
-    return { percent: null, resetsAt: null, weeklyPercent: null, planType: null, status: 'error' };
+    return { ...EMPTY_USAGE, status: 'error' };
   }
 
   if (response.statusCode === 401) {
-    return { percent: null, resetsAt: null, weeklyPercent: null, planType: null, status: 'unauthenticated' };
+    return { ...EMPTY_USAGE, status: 'unauthenticated' };
   }
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    return { percent: null, resetsAt: null, weeklyPercent: null, planType: null, status: 'error' };
+    return { ...EMPTY_USAGE, status: 'error' };
   }
 
   let data;
   try {
     data = JSON.parse(response.body);
   } catch {
-    return { percent: null, resetsAt: null, weeklyPercent: null, planType: null, status: 'error' };
+    return { ...EMPTY_USAGE, status: 'error' };
   }
 
   const fiveHour = data.five_hour || {};

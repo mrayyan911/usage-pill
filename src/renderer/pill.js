@@ -52,9 +52,9 @@
   function switchAgent(nextAgent, isWorking) {
     currentAgent = nextAgent;
     const icons = iconsFor(nextAgent);
+    // Icon and bar-fill both read this via `color`/`background-color: var(--agent-color)`
+    // in pill.css -- one write here drives both.
     pillEl.style.setProperty('--agent-color', icons.color);
-    iconEl.style.color = icons.color;
-    barFillEl.style.backgroundColor = icons.color;
 
     iconEl.classList.add('switching');
     setTimeout(() => {
@@ -133,13 +133,6 @@
     const cls = thresholdClass(percent);
     barFillEl.classList.toggle('amber', cls === 'amber');
     barFillEl.classList.toggle('red', cls === 'red');
-    if (cls !== 'amber' && cls !== 'red' && !agentChanged) {
-      barFillEl.style.backgroundColor = iconsFor(displayAgent).color;
-    } else if (cls === 'amber') {
-      barFillEl.style.backgroundColor = '#E8A33D';
-    } else if (cls === 'red') {
-      barFillEl.style.backgroundColor = '#E5484D';
-    }
 
     pillEl.classList.toggle('danger', cls === 'red');
     pillEl.classList.toggle('working', isWorking && !isNeutralStatus);
