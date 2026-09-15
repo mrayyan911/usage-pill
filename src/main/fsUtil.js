@@ -44,11 +44,11 @@ function statOrNull(filePath) {
 }
 
 /**
- * Returns the most-recently-modified file matching `pattern` (a simple
- * glob: a directory plus a filename prefix/suffix, no wildcards mid-path)
- * under `dir`, or null. Used to find "today's" and "yesterday's" rollout
- * files, and each project's newest transcript, without pulling in a full
- * glob dependency for a handful of known shapes.
+ * Returns `{filePath, mtimeMs}` for the most-recently-modified file matching
+ * `pattern` (a simple glob: a directory plus a filename prefix/suffix, no
+ * wildcards mid-path) under `dir`, or null if none match. Used to find each
+ * project's newest transcript, without pulling in a full glob dependency
+ * for a handful of known shapes.
  */
 function newestFileIn(dir, { prefix = '', suffix = '.jsonl' } = {}) {
   let entries;
@@ -58,7 +58,6 @@ function newestFileIn(dir, { prefix = '', suffix = '.jsonl' } = {}) {
     return null;
   }
   let best = null;
-  let bestMtime = -Infinity;
   for (const entry of entries) {
     if (!entry.isFile()) continue;
     if (prefix && !entry.name.startsWith(prefix)) continue;
@@ -68,9 +67,8 @@ function newestFileIn(dir, { prefix = '', suffix = '.jsonl' } = {}) {
     // carry a trustworthy mtime on Windows.
     const stat = statOrNull(full);
     if (!stat) continue;
-    if (stat.mtimeMs > bestMtime) {
-      bestMtime = stat.mtimeMs;
-      best = full;
+    if (!best || stat.mtimeMs > best.mtimeMs) {
+      best = { filePath: full, mtimeMs: stat.mtimeMs };
     }
   }
   return best;

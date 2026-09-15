@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
-const { readTail, statOrNull } = require('../fsUtil');
+const { readTail, newestFileIn } = require('../fsUtil');
 const { parseClaudeActivity } = require('../parsers/claudeTranscript');
 
 const PROJECTS_ROOT = path.join(os.homedir(), '.claude', 'projects');
@@ -32,25 +32,8 @@ function listCandidateTranscripts() {
   for (const entry of projectDirs) {
     if (!entry.isDirectory()) continue;
     const dir = path.join(PROJECTS_ROOT, entry.name);
-    let files;
-    try {
-      files = fs.readdirSync(dir);
-    } catch {
-      continue;
-    }
-    let newest = null;
-    let newestMtime = -Infinity;
-    for (const name of files) {
-      if (!name.endsWith('.jsonl')) continue;
-      const full = path.join(dir, name);
-      const stat = statOrNull(full);
-      if (!stat) continue;
-      if (stat.mtimeMs > newestMtime) {
-        newestMtime = stat.mtimeMs;
-        newest = full;
-      }
-    }
-    if (newest) candidates.push({ filePath: newest, mtimeMs: newestMtime });
+    const newest = newestFileIn(dir, { suffix: '.jsonl' });
+    if (newest) candidates.push(newest);
   }
 
   candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);

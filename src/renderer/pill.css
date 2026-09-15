@@ -98,6 +98,7 @@ body {
   z-index: 1; /* paints above .pill::before so its opaque background actually occludes the glow, which then only shows in the -6px bleed past this box's edges */
   box-sizing: border-box;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 36px 0fr;
   border-radius: inherit;
   overflow: hidden;
@@ -133,6 +134,7 @@ body {
   justify-content: center;
   font-size: 14px;
   line-height: 1;
+  color: var(--agent-color, #d97757);
   transform-origin: center;
   will-change: transform;
   opacity: 1;
@@ -183,10 +185,22 @@ body {
   height: 100%;
   width: 100%;
   border-radius: 2px;
+  background-color: var(--agent-color, #d97757);
   transform-origin: left center;
   transform: scaleX(0); /* animate scaleX, never width -- compositor-only */
   will-change: transform;
   transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+}
+
+/* Threshold colors take priority over the agent color -- class specificity
+   (two classes vs. one) wins over source order, so these apply regardless
+   of where they sit in the file. */
+.bar-fill.amber {
+  background-color: #e8a33d;
+}
+
+.bar-fill.red {
+  background-color: #e5484d;
 }
 
 .bar-shimmer {
@@ -229,13 +243,23 @@ body {
 }
 
 .detail {
-  font-size: 11px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 14px;
   color: rgba(255, 255, 255, 0.75);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  /* Three lines plus the main row fit within the 86px native window.
+     Unusually long provider plan names remain available by scrolling. */
+  max-height: 42px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
   opacity: 0;
   transition: opacity 0.2s ease 0.14s;
 }
 
 .pill.expanded .detail {
   opacity: 1;
+  padding-bottom: 4px;
 }
