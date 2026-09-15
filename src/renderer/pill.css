@@ -98,6 +98,7 @@ body {
   z-index: 1; /* paints above .pill::before so its opaque background actually occludes the glow, which then only shows in the -6px bleed past this box's edges */
   box-sizing: border-box;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 36px 0fr;
   border-radius: inherit;
   overflow: hidden;
@@ -242,13 +243,23 @@ body {
 }
 
 .detail {
-  font-size: 11px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 14px;
   color: rgba(255, 255, 255, 0.75);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  /* Three lines plus the main row fit within the 86px native window.
+     Unusually long provider plan names remain available by scrolling. */
+  max-height: 42px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
   opacity: 0;
   transition: opacity 0.2s ease 0.14s;
 }
 
 .pill.expanded .detail {
   opacity: 1;
+  padding-bottom: 4px;
 }
