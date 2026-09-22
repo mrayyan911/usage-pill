@@ -7,7 +7,8 @@ normally, two stacked when Claude and Codex are both mid-turn at once.
 Launches top-center of your primary display, Dynamic-Island style — hover
 to expand it in place and see reset time / weekly usage / plan. Drag it
 anywhere on any connected display, collapsed or expanded; it hard-stops at
-the edge of whichever display it's currently over.
+the edge of whichever display it's currently over, and reopens at that same
+spot next launch (falling back to top-center if that display's gone).
 
 ## Run it
 
@@ -24,11 +25,12 @@ USAGE_PILL_DEBUG=1 npm start # also logs every state change to the terminal
 npm test
 ```
 
-49 unit tests cover the parsers (against scrubbed captured payload fixtures),
+60 unit tests cover the parsers (against scrubbed captured payload fixtures),
 the activity-log state machine, launch-position/drag-clamp/hover hit-test
-bounds math, the activity store's sticky dual-agent selection and busy-agent
-handoff preference, and the reducer (including the two-agents-busy-at-once
-case). No Electron runtime needed to run these — they're pure functions.
+bounds math, saved-position load/save round-tripping, the activity store's
+sticky dual-agent selection and busy-agent handoff preference, and the
+reducer (including the two-agents-busy-at-once case). No Electron runtime
+needed to run these — they're pure functions.
 
 ## How activity detection works
 
