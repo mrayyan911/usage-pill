@@ -69,6 +69,7 @@ Several non-obvious platform fixes are baked in and documented inline — don't 
 
 ## Contributing conventions (see `CONTRIBUTING.md` for full detail)
 
+- **Before implementing anything:** check whether local `main` is behind `origin/main` (`git fetch` + `git status -sb` or equivalent) and update it first if so — merge or rebase, resolving any conflicts, before writing any code. Then decide whether the change warrants its own branch (see the rule below) and, if so, create it from the now-current `main` before making any edits. A trivial one-line fix on an already-current `main` doesn't need this ceremony reasserted mid-task — this is about not starting work on stale history or committing multi-file feature work straight to `main`.
 - Branch off `main` as `<type>/<short-kebab-case-description>` (`feat/`, `fix/`, `chore/`, `docs/`, `refactor/`, `test/`); one logical change per branch; PRs merge via squash.
 - **No comments explaining *what* code does** — only non-obvious *why* (platform quirks, workarounds, invariants that would surprise a reader). Names should carry the *what*.
 - Minimal-fix over refactor: a bug fix shouldn't restyle the file around it.
