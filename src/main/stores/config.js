@@ -27,7 +27,8 @@ const WINDOW_HEIGHT = PILL_EXPANDED_HEIGHT + 24;
  * `clampWindowToVisiblePill()` is what dragging actually uses -- it clamps
  * the *visible pill*, not the invisible pre-sized window around it, so the
  * hard stop lands where the user can see it rather than tens of pixels of
- * letterboxing short of the real edge.
+ * letterboxing short of the real edge. `resolveLaunchBounds()` picks
+ * between a saved drag position and `topCenterBounds()` at launch.
  */
 class ConfigStore {
   static topCenterBounds(primaryDisplay) {
@@ -83,6 +84,24 @@ class ConfigStore {
       x: windowBounds.x + (clampedPillRect.x - pillRect.x),
       y: windowBounds.y + (clampedPillRect.y - pillRect.y),
     };
+  }
+
+  /**
+   * Launch-time position: restore a saved drag position only if its display
+   * is still connected (re-clamped in case that display's work area shrank
+   * since saving), otherwise fall back to the default top-center-of-primary
+   * spot -- covers both "never dragged" and "dragged, then that monitor got
+   * unplugged" the same way.
+   */
+  static resolveLaunchBounds({ savedPosition, displays, primaryDisplay }) {
+    if (savedPosition) {
+      const display = displays.find((d) => d.id === savedPosition.displayId);
+      if (display) {
+        const bounds = { x: savedPosition.x, y: savedPosition.y, width: WINDOW_WIDTH, height: WINDOW_HEIGHT };
+        return ConfigStore.clampToWorkArea(bounds, display.workArea);
+      }
+    }
+    return ConfigStore.topCenterBounds(primaryDisplay);
   }
 }
 

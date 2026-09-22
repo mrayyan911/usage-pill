@@ -3,6 +3,7 @@
 const path = require('node:path');
 const { BrowserWindow, screen } = require('electron');
 const { ConfigStore } = require('./stores/config');
+const { PositionStore } = require('./stores/position');
 
 const ALWAYS_ON_TOP_LEVEL = 'screen-saver'; // 'floating' (the alwaysOnTop:true default) sits BELOW the taskbar on Windows
 const REASSERT_INTERVAL_MS = 30_000;
@@ -28,7 +29,11 @@ const DRAG_IDLE_MS = 200;
  */
 function createPillWindow() {
   const primary = screen.getPrimaryDisplay();
-  const bounds = ConfigStore.topCenterBounds(primary);
+  const bounds = ConfigStore.resolveLaunchBounds({
+    savedPosition: PositionStore.load(),
+    displays: screen.getAllDisplays(),
+    primaryDisplay: primary,
+  });
 
   const win = new BrowserWindow({
     x: bounds.x,
@@ -101,32 +106,62 @@ function createPillWindow() {
   let isDragging = false;
   let dragIdleTimer = null;
 
+  // True when the window's center currently falls inside `display`'s full
+  // bounds (not workArea -- we want "which monitor is this on", not
+  // "is it inside the taskbar-excluded region"). Used to tell a display
+  // event that's actually about the pill's own monitor apart from one about
+  // some other, unrelated display -- an unrelated hotplug must never move a
+  // dragged pill.
+  const nearestDisplayFor = (bounds) =>
+    screen.getDisplayNearestPoint({ x: bounds.x + Math.floor(bounds.width / 2), y: bounds.y + Math.floor(bounds.height / 2) });
+
+  const isOnDisplay = (bounds, display) => {
+    const cx = bounds.x + Math.floor(bounds.width / 2);
+    const cy = bounds.y + Math.floor(bounds.height / 2);
+    return (
+      cx >= display.bounds.x &&
+      cx < display.bounds.x + display.bounds.width &&
+      cy >= display.bounds.y &&
+      cy < display.bounds.y + display.bounds.height
+    );
+  };
+
   // display-metrics-changed fires far more often than an actual monitor
   // hotplug (DPI/scale change, taskbar auto-hide toggling, work-area
-  // resize), so this re-clamps the pill's *current* position into whatever
-  // display it's now nearest to rather than teleporting it back to
-  // top-center -- a dragged pill must survive routine display churn, not
-  // just live at a fixed spot. It also covers the actual hotplug case: if
-  // the display the pill was on got removed, the nearest-point lookup lands
-  // it on the closest remaining display instead of off-screen. Clamps the
-  // *visible pill* (clampWindowToVisiblePill), not the larger pre-sized
-  // window, so the hard stop lands where the user can actually see it.
+  // resize), so this re-clamps the pill's *current* position into its own
+  // display's new work area rather than teleporting it back to top-center --
+  // a dragged pill must survive routine display churn, not just live at a
+  // fixed spot. Clamps the *visible pill* (clampWindowToVisiblePill), not
+  // the larger pre-sized window, so the hard stop lands where the user can
+  // actually see it.
   const revalidate = () => {
     if (win.isDestroyed()) return;
     const b = win.getBounds();
-    const display = screen.getDisplayNearestPoint({ x: b.x + Math.floor(b.width / 2), y: b.y + Math.floor(b.height / 2) });
+    const display = nearestDisplayFor(b);
     const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: wasHovering });
     clampGuard = true;
     win.setBounds(clamped);
     clampGuard = false;
   };
-  screen.on('display-added', revalidate);
-  screen.on('display-removed', revalidate);
-  // display-metrics-changed also covers the black-background-after-display-change
-  // regression: recreate is safer than repaint, but at this size a bounds
-  // revalidate + a forced repaint is enough for the common case; a full
-  // destroy/recreate is left as a future hardening step if it's ever observed.
-  screen.on('display-metrics-changed', revalidate);
+  // A newly connected display can never be the one the pill is already on,
+  // so there's nothing of the pill's own to revalidate here -- and doing so
+  // anyway risked re-clamping against a *different*, unrelated display if it
+  // happened to be nearer, dragging an untouched pill along with it.
+  screen.on('display-removed', (_event, oldDisplay) => {
+    if (win.isDestroyed()) return;
+    if (!isOnDisplay(win.getBounds(), oldDisplay)) return; // unrelated disconnect -- leave position untouched
+    // The pill's own display is gone: PositionStore's saved displayId (if
+    // any) is now stale too, so this falls back the same way a fresh launch
+    // would -- top-center of whichever display is primary now.
+    clampGuard = true;
+    win.setBounds(ConfigStore.topCenterBounds(screen.getPrimaryDisplay()));
+    clampGuard = false;
+  });
+  screen.on('display-metrics-changed', (_event, display) => {
+    if (win.isDestroyed()) return;
+    if (!isOnDisplay(win.getBounds(), display)) return; // some other display's metrics changed -- leave position untouched
+    revalidate();
+  });
 
   // Live drag-clamping: a native app-region drag fires 'move' continuously,
   // so re-clamping on every event gives a hard stop at the work-area edge
@@ -139,10 +174,17 @@ function createPillWindow() {
     if (dragIdleTimer) clearTimeout(dragIdleTimer);
     dragIdleTimer = setTimeout(() => {
       isDragging = false;
+      // No distinct drag-end event on Windows (see above), so this same
+      // move-silence timeout doubles as the "persist the drop position"
+      // signal -- writes are naturally debounced to once per drag, not once
+      // per intermediate 'move'.
+      if (win.isDestroyed()) return;
+      const b = win.getBounds();
+      PositionStore.save({ x: b.x, y: b.y, displayId: nearestDisplayFor(b).id });
     }, DRAG_IDLE_MS);
 
     const b = win.getBounds();
-    const display = screen.getDisplayNearestPoint({ x: b.x + Math.floor(b.width / 2), y: b.y + Math.floor(b.height / 2) });
+    const display = nearestDisplayFor(b);
     const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: wasHovering });
     if (clamped.x !== b.x || clamped.y !== b.y) {
       clampGuard = true;

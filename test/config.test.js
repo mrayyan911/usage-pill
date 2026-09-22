@@ -118,3 +118,53 @@ test('config: clampWindowToVisiblePill hard-stops the expanded pill at the edge'
   assert.equal(resultRect.x, PRIMARY.workArea.x);
   assert.equal(resultRect.y, PRIMARY.workArea.y);
 });
+
+test('config: resolveLaunchBounds restores a saved position when its display is still connected', () => {
+  const displays = [
+    { id: 1, workArea: PRIMARY.workArea },
+    { id: 2, workArea: { x: 1920, y: 0, width: 2560, height: 1440 } },
+  ];
+  const result = ConfigStore.resolveLaunchBounds({
+    savedPosition: { x: 2100, y: 400, displayId: 2 },
+    displays,
+    primaryDisplay: PRIMARY,
+  });
+  assert.equal(result.x, 2100);
+  assert.equal(result.y, 400);
+  assert.equal(result.width, WINDOW_WIDTH);
+  assert.equal(result.height, WINDOW_HEIGHT);
+});
+
+test('config: resolveLaunchBounds re-clamps a saved position that no longer fits its display\'s work area', () => {
+  const shrunk = { x: 0, y: 0, width: 400, height: 300 };
+  const displays = [{ id: 1, workArea: shrunk }];
+  const result = ConfigStore.resolveLaunchBounds({
+    savedPosition: { x: 900, y: 700, displayId: 1 },
+    displays,
+    primaryDisplay: PRIMARY,
+  });
+  assert.equal(result.x, shrunk.x + shrunk.width - WINDOW_WIDTH);
+  assert.equal(result.y, shrunk.y + shrunk.height - WINDOW_HEIGHT);
+});
+
+test('config: resolveLaunchBounds falls back to top-center of the primary display when the saved display is disconnected', () => {
+  const displays = [{ id: 1, workArea: PRIMARY.workArea }];
+  const result = ConfigStore.resolveLaunchBounds({
+    savedPosition: { x: 700, y: 400, displayId: 999 },
+    displays,
+    primaryDisplay: PRIMARY,
+  });
+  const expected = ConfigStore.topCenterBounds(PRIMARY);
+  assert.deepEqual(result, expected);
+});
+
+test('config: resolveLaunchBounds falls back to top-center of the primary display when nothing was ever saved', () => {
+  const displays = [{ id: 1, workArea: PRIMARY.workArea }];
+  const result = ConfigStore.resolveLaunchBounds({
+    savedPosition: null,
+    displays,
+    primaryDisplay: PRIMARY,
+  });
+  const expected = ConfigStore.topCenterBounds(PRIMARY);
+  assert.deepEqual(result, expected);
+});
