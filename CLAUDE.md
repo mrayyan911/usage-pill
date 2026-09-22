@@ -72,3 +72,13 @@ Several non-obvious platform fixes are baked in and documented inline — don't 
 ## Commit/PR rules
 
 - **No AI attribution.** Don't add `Co-Authored-By: Claude`, "Generated with Claude Code", or any similar AI-attribution line to commit messages or PR descriptions in this repo.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues (`mrayyan911/usage-pill`), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout (root `CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.
