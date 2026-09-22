@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Usage Pill: a frameless, transparent, always-on-top Electron overlay (Dynamic-Island style, fixed top-center of the primary display) showing real-time Claude Code / Codex usage — an animated bar, a percentage, and an agent badge per active agent. It shows one row for whichever agent is active, and both simultaneously (two badges, two bars) when Claude and Codex are busy at the same time; each row animates only while that agent is mid-turn. Hover the collapsed pill to expand it in place, iOS-Dynamic-Island style. No build step, no frontend framework.
+Usage Pill: a frameless, transparent, always-on-top Electron overlay (Dynamic-Island style, user-draggable, launches top-center of the primary display) showing real-time Claude Code / Codex usage — an animated bar, a percentage, and an agent badge per active agent. It shows one row for whichever agent is active, and both simultaneously (two badges, two bars) when Claude and Codex are busy at the same time; each row animates only while that agent is mid-turn. Hover the collapsed pill to expand it in place, iOS-Dynamic-Island style. No build step, no frontend framework.
 
 ## Visual source of truth
 
@@ -39,6 +39,7 @@ UsageStore (Claude/Codex)┘
 - **`stores/usage.js` (`UsageStore`)** owns the two usage percentages. Claude's comes over HTTP on a 60s cadence plus an edge-triggered refetch the tick after a turn finishes (percent only moves on turn completion); Codex's rides the same free local file scan its activity check already does, so it's refreshed every tick with no separate schedule. Both track `stale`/`error`/`unauthenticated` status with backoff on HTTP failures.
 - **`reduce.js`** is a pure function (`reduce()`) merging one `ActivityStore` snapshot + both usage getters into `{agents, primary}` -- one `agents` row normally (whichever is `active`), two only when Claude and Codex are both `working`/`blocked` at the same time (`primary` first). Wrapped by `Reducer`, which owns the tick loop and only calls `onChange` when the JSON-serialized state actually differs from the last push.
 - **`mock.js` (`MockDriver`)** replaces the whole pipeline above under `USAGE_PILL_MOCK=1`, stepping through a scripted `SCRIPT` array of every state/threshold combo — this is how the animations get visually tuned without needing real usage data.
+- **`stores/config.js` (`ConfigStore`)** is the single source of truth for the pill's geometry (collapsed/expanded width & height, top margin). `window.js` calls `ConfigStore.topCenterBounds()` for the default launch position, `ConfigStore.pillHitRect()` to hover-hit-test against the pill's actual on-screen size rather than the larger pre-sized OS window, and `ConfigStore.clampWindowToVisiblePill()` (built on the lower-level `clampToWorkArea()`) to hard-clamp a dragged position so the *visible pill*, not the invisible window around it, stays within whichever display's work area it's currently over.
 
 ### Two independent activity/usage detection paths
 
@@ -64,10 +65,11 @@ No framework, no build step. `preload.js` is the *only* bridge between main and 
 
 ### `window.js`: Windows-specific Electron gotchas already solved
 
-Several non-obvious platform fixes are baked in and documented inline — don't "simplify" them without reading the comments first: `frame: false` is mandatory for `transparent: true` to work on Windows; `alwaysOnTop` must be reasserted at level `'screen-saver'` (the default `'floating'` sits *below* the taskbar on Windows); the window is sized for its *expanded* state up front since a transparent window can't resize without a visible flash; hover is detected by polling `screen.getCursorScreenPoint()` from the main process rather than CSS `:hover` (unreliable across the transparent surface); bounds are recomputed on every display-added/removed/metrics-changed event for monitor-hotplug recovery.
+Several non-obvious platform fixes are baked in and documented inline — don't "simplify" them without reading the comments first: `frame: false` is mandatory for `transparent: true` to work on Windows; `alwaysOnTop` must be reasserted at level `'screen-saver'` (the default `'floating'` sits *below* the taskbar on Windows); the window is sized for its *expanded* state up front since a transparent window can't resize without a visible flash; hover is detected by polling `screen.getCursorScreenPoint()` against `ConfigStore.pillHitRect()` from the main process rather than CSS `:hover` (unreliable across the transparent surface); dragging (native `-webkit-app-region: drag`, scoped in `pill.css` to the icon/bar surface, not the detail line, in either collapsed or expanded state) is live-clamped via `ConfigStore.clampWindowToVisiblePill()` on every `move` event -- clamping the *visible pill*, not the larger pre-sized window, so it hard-stops flush with the screen edge rather than short of it -- and hover state is frozen (not re-tested) for the duration of a drag, so a grab can't trigger a new expand or collapse an already-expanded card out from under the cursor; bounds are recomputed the same way on every display-added/removed/metrics-changed event, re-clamping the pill's current position rather than resetting it to top-center.
 
 ## Contributing conventions (see `CONTRIBUTING.md` for full detail)
 
+- **Before implementing anything:** check whether local `main` is behind `origin/main` (`git fetch` + `git status -sb` or equivalent) and update it first if so — merge or rebase, resolving any conflicts, before writing any code. Then decide whether the change warrants its own branch (see the rule below) and, if so, create it from the now-current `main` before making any edits. A trivial one-line fix on an already-current `main` doesn't need this ceremony reasserted mid-task — this is about not starting work on stale history or committing multi-file feature work straight to `main`.
 - Branch off `main` as `<type>/<short-kebab-case-description>` (`feat/`, `fix/`, `chore/`, `docs/`, `refactor/`, `test/`); one logical change per branch; PRs merge via squash.
 - **No comments explaining *what* code does** — only non-obvious *why* (platform quirks, workarounds, invariants that would surprise a reader). Names should carry the *what*.
 - Minimal-fix over refactor: a bug fix shouldn't restyle the file around it.
@@ -78,3 +80,13 @@ Several non-obvious platform fixes are baked in and documented inline — don't 
 ## Commit/PR rules
 
 - **No AI attribution.** Don't add `Co-Authored-By: Claude`, "Generated with Claude Code", or any similar AI-attribution line to commit messages or PR descriptions in this repo.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues (`mrayyan911/usage-pill`), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout (root `CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.

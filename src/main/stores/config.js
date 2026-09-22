@@ -20,10 +20,14 @@ const WINDOW_WIDTH = PILL_EXPANDED_WIDTH + 32;
 const WINDOW_HEIGHT = PILL_EXPANDED_HEIGHT + 24;
 
 /**
- * The pill is a fixed Dynamic-Island-style overlay: top-center of the
- * primary display, never user-repositionable. There is nothing to persist --
- * position is recomputed from the current primary display on launch and on
- * every display change (monitor hotplug included).
+ * `topCenterBounds()` computes the pill's default launch position: top-center
+ * of the primary display. `pillHitRect()` is the actual on-screen rect of the
+ * pill (much smaller than the pre-sized OS window) used for hover-to-expand
+ * hit-testing. `clampToWorkArea()` is the raw bounds-clamping primitive;
+ * `clampWindowToVisiblePill()` is what dragging actually uses -- it clamps
+ * the *visible pill*, not the invisible pre-sized window around it, so the
+ * hard stop lands where the user can see it rather than tens of pixels of
+ * letterboxing short of the real edge.
  */
 class ConfigStore {
   static topCenterBounds(primaryDisplay) {
@@ -33,6 +37,16 @@ class ConfigStore {
       y: area.y + TOP_MARGIN,
       width: WINDOW_WIDTH,
       height: WINDOW_HEIGHT,
+    };
+  }
+
+  static clampToWorkArea(bounds, workArea) {
+    const maxX = Math.max(workArea.x, workArea.x + workArea.width - bounds.width);
+    const maxY = Math.max(workArea.y, workArea.y + workArea.height - bounds.height);
+    return {
+      ...bounds,
+      x: Math.min(Math.max(bounds.x, workArea.x), maxX),
+      y: Math.min(Math.max(bounds.y, workArea.y), maxY),
     };
   }
 
@@ -52,6 +66,22 @@ class ConfigStore {
       y: windowBounds.y + PILL_TOP_OFFSET,
       width,
       height,
+    };
+  }
+
+  /**
+   * Clamps the *visible pill* (via pillHitRect) into the work area, then
+   * translates that correction back onto the window bounds -- the window
+   * itself is allowed to sit partly off-screen in its own letterboxing, as
+   * long as the pill inside it never does.
+   */
+  static clampWindowToVisiblePill(windowBounds, workArea, { expanded }) {
+    const pillRect = ConfigStore.pillHitRect(windowBounds, { expanded });
+    const clampedPillRect = ConfigStore.clampToWorkArea(pillRect, workArea);
+    return {
+      ...windowBounds,
+      x: windowBounds.x + (clampedPillRect.x - pillRect.x),
+      y: windowBounds.y + (clampedPillRect.y - pillRect.y),
     };
   }
 }

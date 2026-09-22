@@ -6,8 +6,9 @@ html, body {
 }
 
 body {
-  /* Fixed Dynamic-Island-style position -- the window itself is not
-     draggable (movable:false in window.js), so no app-region:drag here. */
+  /* Deliberately no app-region:drag here -- the draggable surface is scoped
+     to .collapsed-icons/.agent-rows (below) so the transparent letterboxing
+     around the pill never grabs the window. */
   user-select: none;
   font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
   display: flex;
@@ -81,6 +82,21 @@ body {
   justify-content: center;
   gap: 8px;
   padding: 7px 16px;
+  /* Native OS window drag, scoped to the icon/bar surface (this row and
+     .agent-rows below), never .detail -- see window.js's file doc comment.
+     Scoping to the whole window would let the 150ms hover-to-expand poll
+     win the race against mousedown and revoke the drag handle before the
+     user can grab it; scoping to only one of collapsed/expanded would lose
+     the handle entirely once the other state is showing, since the two are
+     swapped in/out rather than one growing out of the other. */
+  -webkit-app-region: drag;
+  cursor: grab;
+}
+
+.collapsed-icons:active {
+  /* Best-effort only: on Windows, the OS takes over cursor handling for the
+     duration of an app-region drag, so this mostly shows pre-drag. */
+  cursor: grabbing;
 }
 
 .pill.expanded .collapsed-row {
@@ -159,6 +175,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  -webkit-app-region: drag;
+  cursor: grab;
+}
+
+.agent-rows:active {
+  cursor: grabbing;
 }
 
 .agent-row {
