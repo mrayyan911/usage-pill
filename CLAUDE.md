@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Usage Pill: a frameless, transparent, always-on-top Electron overlay (Dynamic-Island style, fixed top-center of the primary display) showing real-time Claude Code / Codex usage — an animated bar, a percentage, and an agent badge per active agent. It shows one row for whichever agent is active, and both simultaneously (two badges, two bars) when Claude and Codex are busy at the same time; each row animates only while that agent is mid-turn. Click or hover the collapsed pill to expand it in place, iOS-Dynamic-Island style. No build step, no frontend framework.
+Usage Pill: a frameless, transparent, always-on-top Electron overlay (Dynamic-Island style, fixed top-center of the primary display) showing real-time Claude Code / Codex usage — an animated bar, a percentage, and an agent badge per active agent. It shows one row for whichever agent is active, and both simultaneously (two badges, two bars) when Claude and Codex are busy at the same time; each row animates only while that agent is mid-turn. Hover the collapsed pill to expand it in place, iOS-Dynamic-Island style. No build step, no frontend framework.
 
 ## Visual source of truth
 

@@ -97,14 +97,19 @@ function createPillWindow() {
 
   // Hover-to-expand, detected from the main process: CSS :hover / renderer
   // DOM events are unreliable across the transparent surface on Windows, so
-  // this polls the cursor against the window bounds instead. The expanded
-  // detail row grows in place inside the same (already large enough)
-  // window, so the hover target is just the window's own bounds.
+  // this polls the cursor against the pill's own rect instead. The OS window
+  // is pre-sized for the *expanded* state (so the grow animation is never
+  // clipped), which is much larger than the collapsed pill -- hit-testing
+  // against the full window bounds would trigger expansion from well outside
+  // the visible pill. `wasHovering` also picks which rect to test: the small
+  // collapsed rect while collapsed (so only touching the pill expands it),
+  // the larger expanded rect once expanded (so it doesn't snap shut the
+  // moment the cursor drifts past the collapsed footprint).
   let wasHovering = false;
   const hoverTimer = setInterval(() => {
     if (win.isDestroyed() || !win.isVisible()) return;
     const cursor = screen.getCursorScreenPoint();
-    const b = win.getBounds();
+    const b = ConfigStore.pillHitRect(win.getBounds(), { expanded: wasHovering });
     const isHovering = cursor.x >= b.x && cursor.x <= b.x + b.width && cursor.y >= b.y && cursor.y <= b.y + b.height;
     if (isHovering !== wasHovering) {
       wasHovering = isHovering;

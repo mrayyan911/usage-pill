@@ -66,8 +66,8 @@ body {
 }
 
 /* Collapsed strip: just the agent icon(s), centered -- the small resting
-   island. Swapped out for .expanded-card on hover/click, not stacked above
-   it, so the compact icons fully vanish rather than leaving a gap. */
+   island. Swapped out for .expanded-card on hover, not stacked above it, so
+   the compact icons fully vanish rather than leaving a gap. */
 .collapsed-row {
   min-height: 0;
   overflow: hidden;
