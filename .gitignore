@@ -3,6 +3,12 @@ dist/
 out/
 *.log
 .DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+.env
+.env.local
 .gstack/
 .claude.local.md
 
