@@ -1,18 +1,20 @@
 'use strict';
 
-// Compact "island" footprint.
-const PILL_WIDTH = 240;
+// Compact "island" footprint -- widest case (two collapsed agent icons).
+const PILL_WIDTH = 104;
 const PILL_HEIGHT = 36;
 // Expanded footprint on hover -- the pill grows in place to reveal the
-// detail row, so the OS window is sized for the expanded state up front.
+// agent row(s), so the OS window is sized for the expanded state up front.
 // A transparent window can't be resized without a visible flash, and
-// "never clipped" matters more here than "small when idle".
-const PILL_EXPANDED_WIDTH = 260;
+// "never clipped" matters more here than "small when idle". Height covers
+// the tallest case: two stacked agent rows when both agents are busy at
+// once (see reduce.js) -- a single-row expand just grows less far inside it.
+const PILL_EXPANDED_WIDTH = 248;
 const PILL_EXPANDED_HEIGHT = 78;
 const TOP_MARGIN = 10; // sits just under the menu bar, like Dynamic Island
 
-const WINDOW_WIDTH = PILL_EXPANDED_WIDTH + 8;
-const WINDOW_HEIGHT = PILL_EXPANDED_HEIGHT + 8;
+const WINDOW_WIDTH = PILL_EXPANDED_WIDTH + 32;
+const WINDOW_HEIGHT = PILL_EXPANDED_HEIGHT + 24;
 
 /**
  * The pill is a fixed Dynamic-Island-style overlay: top-center of the

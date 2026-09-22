@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Usage Pill — native-scale state board</title>
+<style>
+  body { margin: 40px; background: #181818; color: #d0d0d0; font: 14px system-ui, sans-serif; }
+  h1 { font-size: 20px; font-weight: 500; }
+  p { color: #999; max-width: 620px; line-height: 1.6; }
+  main { display: grid; grid-template-columns: repeat(2, 280px); gap: 28px 36px; margin-top: 32px; }
+  figure { margin: 0; }
+  figcaption { margin-bottom: 12px; font-size: 12px; color: #aaa; }
+  img { display: block; width: 280px; height: 102px; }
+  @media (max-width: 680px) { main { grid-template-columns: 280px; } }
+</style>
+<h1>Collapsed = presence. Expanded = information.</h1>
+<p>Actual Electron captures. View at 100% zoom; each image includes the transparent native window's margins. The older large concept board describes state structure only.</p>
+<main>
+  <figure><figcaption>One agent · collapsed · 84 × 36px</figcaption><img src="../../design-review/screenshots/compact-collapsed-one.png" alt="Tiny dark pill with a centered Claude mark"></figure>
+  <figure><figcaption>Two agents · collapsed · 104 × 36px</figcaption><img src="../../design-review/screenshots/compact-collapsed-two.png" alt="Tiny dark pill with two closely spaced agent marks"></figure>
+  <figure><figcaption>One agent · expanded · 248 × 50px</figcaption><img src="../../design-review/screenshots/compact-expanded-one.png" alt="Claude mark, thin usage bar and 60 percent"></figure>
+  <figure><figcaption>Two agents · expanded · 248 × 74px</figcaption><img src="../../design-review/screenshots/compact-expanded-two.png" alt="Two compact rows showing Claude at 60 percent and Codex at 90 percent"></figure>
+</main>
+</html>

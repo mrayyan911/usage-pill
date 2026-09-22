@@ -5,3 +5,7 @@ out/
 .DS_Store
 .gstack/
 .claude.local.md
+
+# Scratch output from agent design-review tooling (screenshots, reports,
+# logs) -- not source, regenerated per run.
+design-review/

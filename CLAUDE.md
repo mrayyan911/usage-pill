@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Usage Pill: a frameless, transparent, always-on-top Electron overlay (Dynamic-Island style, fixed top-center of the primary display) showing real-time Claude Code / Codex usage — one animated bar, one percentage, one agent icon. It auto-follows whichever agent (Claude or Codex) is actively in use and animates only while that agent is mid-turn. No build step, no frontend framework.
+Usage Pill: a frameless, transparent, always-on-top Electron overlay (Dynamic-Island style, fixed top-center of the primary display) showing real-time Claude Code / Codex usage — an animated bar, a percentage, and an agent badge per active agent. It shows one row for whichever agent is active, and both simultaneously (two badges, two bars) when Claude and Codex are busy at the same time; each row animates only while that agent is mid-turn. Click or hover the collapsed pill to expand it in place, iOS-Dynamic-Island style. No build step, no frontend framework.
+
+## Visual source of truth
+
+The small reference screenshot is the visual authority, as specified in [the design verdict](docs/qa/Verdits/dynamic-island-agent-ui-design-verdict.md). The large `docs/design/usage-pill design.png` board communicates state structure only, never scale, spacing, borders, glow, or icon sizes. See [the current dimensions and rendered state board](docs/design/README.md).
+
+Keep the surface almost black, its boundary barely visible, icons optically balanced, and expanded rows dense. No outer glow, luminous perimeter, or circular avatar tiles. Collapsed means presence; expanded means information.
 
 ## Commands
 
@@ -29,9 +35,9 @@ ActivityStore.poll()  ──┐
 UsageStore (Claude/Codex)┘
 ```
 
-- **`stores/activity.js` (`ActivityStore`)** polls both agents every tick (`Reducer`'s `tickMs`, ~400ms) and arbitrates staleness: a `working`/`blocked` reading whose source file hasn't changed in `STALE_MS` (180s — empirically the longest observed real tool call) triggers a rate-limited (`processCheck.js`, min 10s between probes) `tasklist` liveness check before forcing the state to `idle`. Whichever agent's source file has the newer mtime becomes the single `active` agent reported to the renderer.
+- **`stores/activity.js` (`ActivityStore`)** polls both agents every tick (`Reducer`'s `tickMs`, ~400ms) and arbitrates staleness: a `working`/`blocked` reading whose source file hasn't changed in `STALE_MS` (180s — empirically the longest observed real tool call) triggers a rate-limited (`processCheck.js`, min 10s between probes) `tasklist` liveness check before forcing the state to `idle`. Whichever agent's source file has the newer mtime becomes `active` (used as row order); both agents' individual states are still reported. `active` is sticky while the current active agent stays busy -- without that, two genuinely-concurrent busy agents can leapfrog each other's mtime almost every tick, flipping row order that often (see the renderer note below for why that specifically matters).
 - **`stores/usage.js` (`UsageStore`)** owns the two usage percentages. Claude's comes over HTTP on a 60s cadence plus an edge-triggered refetch the tick after a turn finishes (percent only moves on turn completion); Codex's rides the same free local file scan its activity check already does, so it's refreshed every tick with no separate schedule. Both track `stale`/`error`/`unauthenticated` status with backoff on HTTP failures.
-- **`reduce.js`** is a pure function (`reduce()`) merging one `ActivityStore` snapshot + both usage getters into the single shape the renderer consumes, wrapped by `Reducer`, which owns the tick loop and only calls `onChange` when the JSON-serialized state actually differs from the last push.
+- **`reduce.js`** is a pure function (`reduce()`) merging one `ActivityStore` snapshot + both usage getters into `{agents, primary}` -- one `agents` row normally (whichever is `active`), two only when Claude and Codex are both `working`/`blocked` at the same time (`primary` first). Wrapped by `Reducer`, which owns the tick loop and only calls `onChange` when the JSON-serialized state actually differs from the last push.
 - **`mock.js` (`MockDriver`)** replaces the whole pipeline above under `USAGE_PILL_MOCK=1`, stepping through a scripted `SCRIPT` array of every state/threshold combo — this is how the animations get visually tuned without needing real usage data.
 
 ### Two independent activity/usage detection paths
@@ -54,7 +60,7 @@ UsageStore (Claude/Codex)┘
 
 ### Renderer (`src/renderer/`, `src/preload.js`)
 
-No framework, no build step. `preload.js` is the *only* bridge between main and renderer (`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`), exposing `window.usagePill.onState`/`onHover`. `pill.js` is one IPC listener driving DOM class toggles and a walk-cycle glyph animation; per-agent color is a single `--agent-color` CSS custom property write (`pill.js`) consumed declaratively by `pill.css` for both the icon and bar-fill, with `.bar-fill.amber`/`.red` classes overriding it above threshold via specificity — don't reintroduce imperative `style.backgroundColor` branching here. `icons.js` procedurally builds pixel-sprite SVGs (not embedded brand logos) so Claude/Codex get distinct silhouettes without any image assets or trademark risk.
+No framework, no build step. `preload.js` is the *only* bridge between main and renderer (`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`), exposing `window.usagePill.onState`/`onHover`. `pill.js` renders `state.agents` (1 or 2 entries) into a collapsed icon strip and an expanded card of one row per agent, using a keyed reconciliation (`reorderByKey`) that reuses a DOM node as long as its agent is still shown -- reordering two still-shown agents moves the existing nodes via `insertBefore` instead of recreating them. This matters because `active` (the order/primary signal from `ActivityStore.poll()`, see below) is only sticky, not fully stable, so a purely position-keyed diff would periodically rebuild both rows and restart their CSS animations (badge pulse, shimmer sweep) while both agents are simultaneously busy. Per-row color is a `--row-color` CSS custom property write (`pill.js`, one per `.agent-row`) consumed declaratively by `pill.css` for the bar-fill, with `.bar-fill.amber`/`.red` classes overriding it above threshold via specificity — don't reintroduce imperative `style.backgroundColor` branching here. `icons.js` inlines the real brand marks (mirrored from `assests/claude-code-color.svg` and `assests/codex-dark.svg`, kept in sync by hand) as SVG markup generated with unique paint-server IDs and restrained terracotta/satin-silver material shading, injected via `innerHTML` rather than `<img src>` so the CSP never needs to widen for a repo-root assets folder.
 
 ### `window.js`: Windows-specific Electron gotchas already solved
 
