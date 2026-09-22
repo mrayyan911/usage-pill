@@ -6,8 +6,9 @@ html, body {
 }
 
 body {
-  /* Fixed Dynamic-Island-style position -- the window itself is not
-     draggable (movable:false in window.js), so no app-region:drag here. */
+  /* Deliberately no app-region:drag here -- the draggable surface is scoped
+     to .pill-inner (below) so the transparent letterboxing around the pill
+     never grabs the window. */
   user-select: none;
   font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
   display: flex;
@@ -117,6 +118,19 @@ body {
   align-items: center;
   gap: 8px;
   padding: 0 14px;
+  /* Native OS window drag, scoped to this row (the always-visible collapsed
+     surface) so it stays grabbable even once .expanded -- .detail-row below
+     is deliberately excluded. Scoping to the whole window would let the
+     150ms hover-to-expand poll (window.js) win the race against mousedown
+     and revoke the drag handle before the user can grab it. */
+  -webkit-app-region: drag;
+  cursor: grab;
+}
+
+.pill-row:active {
+  /* Best-effort only: on Windows, the OS takes over cursor handling for the
+     duration of an app-region drag, so this mostly shows pre-drag. */
+  cursor: grabbing;
 }
 
 .icon-wrap {

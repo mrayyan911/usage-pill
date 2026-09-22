@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Usage Pill: a frameless, transparent, always-on-top Electron overlay (Dynamic-Island style, fixed top-center of the primary display) showing real-time Claude Code / Codex usage — one animated bar, one percentage, one agent icon. It auto-follows whichever agent (Claude or Codex) is actively in use and animates only while that agent is mid-turn. No build step, no frontend framework.
+Usage Pill: a frameless, transparent, always-on-top Electron overlay (Dynamic-Island style, user-draggable, launches top-center of the primary display) showing real-time Claude Code / Codex usage — one animated bar, one percentage, one agent icon. It auto-follows whichever agent (Claude or Codex) is actively in use and animates only while that agent is mid-turn. No build step, no frontend framework.
 
 ## Commands
 
@@ -33,6 +33,7 @@ UsageStore (Claude/Codex)┘
 - **`stores/usage.js` (`UsageStore`)** owns the two usage percentages. Claude's comes over HTTP on a 60s cadence plus an edge-triggered refetch the tick after a turn finishes (percent only moves on turn completion); Codex's rides the same free local file scan its activity check already does, so it's refreshed every tick with no separate schedule. Both track `stale`/`error`/`unauthenticated` status with backoff on HTTP failures.
 - **`reduce.js`** is a pure function (`reduce()`) merging one `ActivityStore` snapshot + both usage getters into the single shape the renderer consumes, wrapped by `Reducer`, which owns the tick loop and only calls `onChange` when the JSON-serialized state actually differs from the last push.
 - **`mock.js` (`MockDriver`)** replaces the whole pipeline above under `USAGE_PILL_MOCK=1`, stepping through a scripted `SCRIPT` array of every state/threshold combo — this is how the animations get visually tuned without needing real usage data.
+- **`stores/config.js` (`ConfigStore`)** is the single source of truth for the pill's geometry (collapsed/expanded width & height, top margin); `window.js` calls `ConfigStore.topCenterBounds()` for the default launch position, `ConfigStore.clampToWorkArea()` to hard-clamp a dragged position to whichever display's work area it's currently over, and derives its hover hit-test region from the same constants.
 
 ### Two independent activity/usage detection paths
 

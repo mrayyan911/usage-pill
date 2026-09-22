@@ -15,10 +15,10 @@ const WINDOW_WIDTH = PILL_EXPANDED_WIDTH + 8;
 const WINDOW_HEIGHT = PILL_EXPANDED_HEIGHT + 8;
 
 /**
- * The pill is a fixed Dynamic-Island-style overlay: top-center of the
- * primary display, never user-repositionable. There is nothing to persist --
- * position is recomputed from the current primary display on launch and on
- * every display change (monitor hotplug included).
+ * `topCenterBounds()` computes the pill's default launch position: top-center
+ * of the primary display. `clampToWorkArea()` keeps a user-dragged position
+ * within whichever display's work area it's currently over -- a hard stop at
+ * the edge, no elastic resistance.
  */
 class ConfigStore {
   static topCenterBounds(primaryDisplay) {
@@ -28,6 +28,16 @@ class ConfigStore {
       y: area.y + TOP_MARGIN,
       width: WINDOW_WIDTH,
       height: WINDOW_HEIGHT,
+    };
+  }
+
+  static clampToWorkArea(bounds, workArea) {
+    const maxX = Math.max(workArea.x, workArea.x + workArea.width - bounds.width);
+    const maxY = Math.max(workArea.y, workArea.y + workArea.height - bounds.height);
+    return {
+      ...bounds,
+      x: Math.min(Math.max(bounds.x, workArea.x), maxX),
+      y: Math.min(Math.max(bounds.y, workArea.y), maxY),
     };
   }
 }

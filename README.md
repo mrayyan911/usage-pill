@@ -4,8 +4,10 @@ A tiny always-on-top overlay showing real-time Claude Code / Codex usage: one
 animated bar, one percentage, one agent icon. Auto-follows whichever agent
 you're actively using and animates only while that agent is mid-turn.
 
-Fixed at the top-center of your primary display, Dynamic-Island style — hover
-to expand it in place and see reset time / weekly usage / plan.
+Launches top-center of your primary display, Dynamic-Island style — hover
+to expand it in place and see reset time / weekly usage / plan. Drag it
+(while collapsed) anywhere on any connected display; it hard-stops at the
+edge of whichever display it's currently over.
 
 ## Run it
 
@@ -22,8 +24,8 @@ USAGE_PILL_DEBUG=1 npm start # also logs every state change to the terminal
 npm test
 ```
 
-24 unit tests cover the parsers (against real captured payload fixtures),
-the activity-log state machine, fixed-position bounds math, and the reducer.
+34 unit tests cover the parsers (against real captured payload fixtures),
+the activity-log state machine, launch-position/drag-clamp bounds math, and the reducer.
 No Electron runtime needed to run these — they're pure functions.
 
 ## How activity detection works
