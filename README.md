@@ -22,11 +22,11 @@ USAGE_PILL_DEBUG=1 npm start # also logs every state change to the terminal
 npm test
 ```
 
-37 unit tests cover the parsers (against real captured payload fixtures),
+39 unit tests cover the parsers (against real captured payload fixtures),
 the activity-log state machine, fixed-position bounds math, the activity
-store's sticky dual-agent selection, and the reducer (including the
-two-agents-busy-at-once case). No Electron runtime needed to
-run these — they're pure functions.
+store's sticky dual-agent selection and busy-agent handoff preference, and
+the reducer (including the two-agents-busy-at-once case). No Electron
+runtime needed to run these — they're pure functions.
 
 ## How activity detection works
 

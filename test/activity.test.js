@@ -63,6 +63,28 @@ for (const primary of ['claude', 'codex']) {
   });
 }
 
+for (const primary of ['claude', 'codex']) {
+  test(`activity: ${primary} finishing (its own "stop" write bumps its mtime) must not steal active from the still-busy agent`, () => {
+    const { inputs, store } = fixture();
+    inputs.claude = { state: 'working', mtimeMs: primary === 'claude' ? 200 : 100 };
+    inputs.codex = { activity: 'working', newestMtimeMs: primary === 'codex' ? 200 : 100 };
+    assert.equal(store.poll().active, primary);
+
+    const secondary = primary === 'claude' ? 'codex' : 'claude';
+    const stateKey = primary === 'claude' ? 'state' : 'activity';
+    const primaryMtimeKey = primary === 'claude' ? 'mtimeMs' : 'newestMtimeMs';
+
+    // A real handoff: the primary's own idle-transition write both flips its
+    // state AND bumps its mtime past the still-busy secondary's.
+    inputs[primary][stateKey] = 'idle';
+    inputs[primary][primaryMtimeKey] = 500;
+    const handedOff = store.poll();
+    assert.equal(handedOff.active, secondary);
+    assert.equal(handedOff[secondary], 'working');
+    assert.equal(handedOff[primary], 'idle');
+  });
+}
+
 test('activity: losing both sources clears sticky selection before another agent appears', () => {
   const { inputs, store } = fixture();
   inputs.claude = { state: 'working', mtimeMs: 100 };

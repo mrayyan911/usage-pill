@@ -214,9 +214,6 @@
     pillEl.classList.toggle('agents-2', rowStates.length === 2);
     pillEl.classList.toggle('agents-1', rowStates.length === 1);
 
-    const primaryKey = state.primary || keyOf(rowStates[0]);
-    pillEl.style.setProperty('--agent-color', iconsFor(primaryKey).color);
-
     reconcileCollapsed(rowStates);
     const { anyWorking, anyDanger } = reconcileAgentRows(rowStates);
 

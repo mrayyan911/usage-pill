@@ -141,6 +141,14 @@ class ActivityStore {
       // pinned while it's still busy means order only changes on a real
       // handoff (the active agent actually going idle).
       active = this._stickyActive;
+    } else if (isBusy(claudeState) !== isBusy(codexState)) {
+      // Exactly one agent is busy: prefer it outright. A working -> idle
+      // transition is itself usually a fresh write (e.g. the hook log's
+      // "stop" line), so on a handoff the agent that just finished can
+      // transiently out-mtime the other agent that's still working --
+      // raw mtime comparison would then pick the wrong (idle) agent for
+      // one tick.
+      active = isBusy(claudeState) ? 'claude' : 'codex';
     } else {
       active = claudeMtime >= codexMtime ? 'claude' : 'codex';
     }
