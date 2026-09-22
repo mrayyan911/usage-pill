@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const { BrowserWindow, screen } = require('electron');
+const { BrowserWindow, Menu, screen } = require('electron');
 const { ConfigStore } = require('./stores/config');
 const { PositionStore } = require('./stores/position');
 
@@ -105,6 +105,51 @@ function createPillWindow() {
   let clampGuard = false;
   let isDragging = false;
   let dragIdleTimer = null;
+  let menuOpen = false;
+
+  const restoreDefaultPosition = () => {
+    // A pending drag save must not recreate the position after a reset.
+    if (dragIdleTimer) clearTimeout(dragIdleTimer);
+    dragIdleTimer = null;
+    isDragging = false;
+    clampGuard = true;
+    try {
+      win.setBounds(ConfigStore.topCenterBounds(screen.getPrimaryDisplay()));
+    } finally {
+      clampGuard = false;
+    }
+  };
+
+  const positionMenu = Menu.buildFromTemplate([{
+    label: 'Reset position',
+    click: () => {
+      if (win.isDestroyed()) return;
+      PositionStore.clear();
+      restoreDefaultPosition();
+    },
+  }]);
+
+  const showPositionMenu = () => {
+    if (win.isDestroyed() || menuOpen) return;
+    menuOpen = true;
+    positionMenu.popup({ window: win, callback: () => { menuOpen = false; } });
+  };
+
+  // Windows routes right-clicks on app-region:drag through the native
+  // non-client menu event, bypassing webContents' context-menu event.
+  win.on('system-context-menu', (event) => {
+    event.preventDefault();
+    showPositionMenu();
+  });
+  win.webContents.on('context-menu', (_event, params) => {
+    const bounds = win.getBounds();
+    const rect = ConfigStore.pillHitRect(bounds, { expanded: wasHovering });
+    const x = bounds.x + params.x;
+    const y = bounds.y + params.y;
+    if (x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height) {
+      showPositionMenu();
+    }
+  });
 
   // True when the window's center currently falls inside `display`'s full
   // bounds (not workArea -- we want "which monitor is this on", not
@@ -153,9 +198,7 @@ function createPillWindow() {
     // The pill's own display is gone: PositionStore's saved displayId (if
     // any) is now stale too, so this falls back the same way a fresh launch
     // would -- top-center of whichever display is primary now.
-    clampGuard = true;
-    win.setBounds(ConfigStore.topCenterBounds(screen.getPrimaryDisplay()));
-    clampGuard = false;
+    restoreDefaultPosition();
   });
   screen.on('display-metrics-changed', (_event, display) => {
     if (win.isDestroyed()) return;
@@ -213,7 +256,7 @@ function createPillWindow() {
   // own drag handle, .agent-rows, only exists while expanded).
   const hoverTimer = setInterval(() => {
     if (win.isDestroyed() || !win.isVisible()) return;
-    if (isDragging) return;
+    if (isDragging || menuOpen) return;
     const cursor = screen.getCursorScreenPoint();
     const b = ConfigStore.pillHitRect(win.getBounds(), { expanded: wasHovering });
     const isHovering = cursor.x >= b.x && cursor.x <= b.x + b.width && cursor.y >= b.y && cursor.y <= b.y + b.height;

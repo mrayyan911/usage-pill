@@ -56,6 +56,24 @@ test('position: a later save overwrites the earlier one', () => {
   });
 });
 
+test('position: clearing a saved position restores the default on the next load', () => {
+  withTempLocalAppData(() => {
+    PositionStore.save({ x: 123, y: 45, displayId: 7 });
+    PositionStore.clear();
+    assert.equal(PositionStore.load(), null);
+  });
+});
+
+test('position: clearing an absent position is safe to repeat', () => {
+  withTempLocalAppData(() => {
+    PositionStore.clear();
+    PositionStore.clear();
+    assert.equal(PositionStore.load(), null);
+    PositionStore.save({ x: 10, y: 20, displayId: 1 });
+    assert.deepEqual(PositionStore.load(), { x: 10, y: 20, displayId: 1 });
+  });
+});
+
 test('position: load tolerates a corrupt (non-JSON) file rather than throwing', () => {
   withTempLocalAppData((dir) => {
     fs.mkdirSync(path.join(dir, 'usage-pill'), { recursive: true });

@@ -38,6 +38,10 @@ class PositionStore {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, JSON.stringify({ x, y, displayId }));
   }
+
+  static clear() {
+    fs.rmSync(positionFilePath(), { force: true });
+  }
 }
 
 module.exports = { PositionStore, positionFilePath };
