@@ -3,5 +3,15 @@ dist/
 out/
 *.log
 .DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+.env
+.env.local
 .gstack/
 .claude.local.md
+
+# Scratch output from agent design-review tooling (screenshots, reports,
+# logs) -- not source, regenerated per run.
+design-review/

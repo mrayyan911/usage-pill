@@ -7,7 +7,7 @@
   "author": "Muhammad Rayyan",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/parsers.test.js test/activityLog.test.js test/config.test.js test/reduce.test.js test/fsUtil.test.js"
+    "test": "node --test test/parsers.test.js test/activityLog.test.js test/config.test.js test/reduce.test.js test/fsUtil.test.js test/activity.test.js"
   },
   "devDependencies": {
     "electron": "^44.3.0"

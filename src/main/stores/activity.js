@@ -69,6 +69,7 @@ class ActivityStore {
     this._lastMtimeSeen = { claude: null, codex: null };
     this._lastProcessProbe = { claude: 0, codex: 0 };
     this._lastKnownState = { claude: 'idle', codex: 'idle' };
+    this._stickyActive = null; // 'claude' | 'codex' | null -- see poll()
   }
 
   _arbitrate(agent, raw, imageNames) {
@@ -124,13 +125,34 @@ class ActivityStore {
 
     const claudeMtime = claudeRaw.mtimeMs ?? -Infinity;
     const codexMtime = codexRaw.mtimeMs ?? -Infinity;
+    const isBusy = (state) => state === 'working' || state === 'blocked';
 
-    let active = null;
+    let active;
     if (claudeMtime === -Infinity && codexMtime === -Infinity) {
       active = null;
+    } else if (this._stickyActive && isBusy(this._stickyActive === 'claude' ? claudeState : codexState)) {
+      // Sticky on purpose: when both agents are busy at once, each one's
+      // backing file gets touched independently, so raw mtime comparison
+      // can flip which one is "newer" almost every tick. Reduce.js orders
+      // its two-row output by `active`, so an unstuck flip-flop here would
+      // reorder both agent rows every ~400ms -- and the renderer key on
+      // that order previously destroyed/rebuilt both rows every time,
+      // restarting their CSS animations. Keeping the current active agent
+      // pinned while it's still busy means order only changes on a real
+      // handoff (the active agent actually going idle).
+      active = this._stickyActive;
+    } else if (isBusy(claudeState) !== isBusy(codexState)) {
+      // Exactly one agent is busy: prefer it outright. A working -> idle
+      // transition is itself usually a fresh write (e.g. the hook log's
+      // "stop" line), so on a handoff the agent that just finished can
+      // transiently out-mtime the other agent that's still working --
+      // raw mtime comparison would then pick the wrong (idle) agent for
+      // one tick.
+      active = isBusy(claudeState) ? 'claude' : 'codex';
     } else {
       active = claudeMtime >= codexMtime ? 'claude' : 'codex';
     }
+    this._stickyActive = active;
 
     return {
       active,
