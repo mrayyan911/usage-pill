@@ -1,13 +1,13 @@
 # Usage Pill
 
-A tiny always-on-top overlay showing real-time Claude Code / Codex usage: one
-animated bar, one percentage, one agent icon. Auto-follows whichever agent
-you're actively using and animates only while that agent is mid-turn.
+A tiny always-on-top overlay showing real-time Claude Code / Codex usage: an
+animated bar, a percentage, and an agent badge per active agent — one row
+normally, two stacked when Claude and Codex are both mid-turn at once.
 
 Launches top-center of your primary display, Dynamic-Island style — hover
 to expand it in place and see reset time / weekly usage / plan. Drag it
-(while collapsed) anywhere on any connected display; it hard-stops at the
-edge of whichever display it's currently over.
+anywhere on any connected display, collapsed or expanded; it hard-stops at
+the edge of whichever display it's currently over.
 
 ## Run it
 
@@ -24,9 +24,11 @@ USAGE_PILL_DEBUG=1 npm start # also logs every state change to the terminal
 npm test
 ```
 
-34 unit tests cover the parsers (against real captured payload fixtures),
-the activity-log state machine, launch-position/drag-clamp bounds math, and the reducer.
-No Electron runtime needed to run these — they're pure functions.
+49 unit tests cover the parsers (against scrubbed captured payload fixtures),
+the activity-log state machine, launch-position/drag-clamp/hover hit-test
+bounds math, the activity store's sticky dual-agent selection and busy-agent
+handoff preference, and the reducer (including the two-agents-busy-at-once
+case). No Electron runtime needed to run these — they're pure functions.
 
 ## How activity detection works
 

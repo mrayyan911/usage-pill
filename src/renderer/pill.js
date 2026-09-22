@@ -2,66 +2,28 @@
 
 (function () {
   const pillEl = document.getElementById('pill');
-  const iconEl = document.getElementById('icon');
-  const barFillEl = document.getElementById('barFill');
-  const barShimmerEl = document.getElementById('barShimmer');
-  const percentEl = document.getElementById('percent');
+  const collapsedRowEl = document.getElementById('collapsedRow');
+  const agentRowsEl = document.getElementById('agentRows');
   const detailEl = document.getElementById('detail');
 
-  // 4 frames * 140ms = 560ms per walk cycle, matching the .icon.working
-  // bounce animation duration in pill.css so the bounce peak lands on beat.
-  const GLYPH_INTERVAL_MS = 140;
-
-  let glyphTimer = null;
-  let glyphIndex = 0;
-  let currentAgent = null; // 'claude' | 'codex' | 'neutral'
   let lastState = null;
+  // Persistent per-agent-identity DOM refs, reused across ticks so an
+  // in-place percent/state update never restarts a running CSS animation
+  // (working pulse, shimmer sweep) -- a node is only rebuilt when the
+  // agent it represents actually stops being shown. Reordering two
+  // still-shown agents (which agent's row order flips) moves the existing
+  // nodes via insertBefore instead of recreating them, since a keyed-only
+  // reconciliation was still order-sensitive and could destroy both rows
+  // on every tick while both agents were simultaneously busy.
+  let collapsed = []; // [{ agentKey, el }]
+  let rows = []; // [{ agentKey, el, badgeEl, fillEl, shimmerEl, percentEl }]
 
-  function iconsFor(agent) {
-    return window.PILL_ICONS[agent] || window.PILL_ICONS.neutral;
+  function iconsFor(agentKey) {
+    return window.PILL_ICONS[agentKey] || window.PILL_ICONS.neutral;
   }
 
-  /** SVG sprite frames need innerHTML; plain glyph frames stay as text. */
-  function setIconFrame(agent, content) {
-    if (iconsFor(agent).type === 'svg') {
-      iconEl.innerHTML = content;
-    } else {
-      iconEl.textContent = content;
-    }
-  }
-
-  function stopGlyphCycle() {
-    if (glyphTimer) {
-      clearInterval(glyphTimer);
-      glyphTimer = null;
-    }
-  }
-
-  function startGlyphCycle(agent) {
-    stopGlyphCycle();
-    const frames = iconsFor(agent).workingFrames;
-    glyphIndex = 0;
-    setIconFrame(agent, frames[0]);
-    glyphTimer = setInterval(() => {
-      glyphIndex = (glyphIndex + 1) % frames.length;
-      setIconFrame(agent, frames[glyphIndex]);
-    }, GLYPH_INTERVAL_MS);
-  }
-
-  /** 260ms crossfade + 4px slide when the active agent changes. */
-  function switchAgent(nextAgent, isWorking) {
-    currentAgent = nextAgent;
-    const icons = iconsFor(nextAgent);
-    // Icon and bar-fill both read this via `color`/`background-color: var(--agent-color)`
-    // in pill.css -- one write here drives both.
-    pillEl.style.setProperty('--agent-color', icons.color);
-
-    iconEl.classList.add('switching');
-    setTimeout(() => {
-      setIconFrame(nextAgent, isWorking ? icons.workingFrames[0] : icons.idleGlyph);
-      iconEl.classList.remove('switching');
-      if (isWorking) startGlyphCycle(nextAgent);
-    }, 150);
+  function keyOf(row) {
+    return row.agent || 'neutral';
   }
 
   function thresholdClass(percent) {
@@ -87,8 +49,8 @@
     return `resets in ${m}m`;
   }
 
-  function statusNote(state) {
-    switch (state.status) {
+  function statusNote(row) {
+    switch (row.status) {
       case 'unauthenticated':
         return 'sign in to Claude Code';
       case 'stale':
@@ -102,51 +64,163 @@
     }
   }
 
-  function render(state) {
-    const agent = state.agent || 'neutral';
-    const isWorking = state.state === 'working';
-    const isBlocked = state.state === 'blocked';
-    const isBusy = isWorking || isBlocked;
-    const isNeutralStatus = state.status === 'unauthenticated' || state.status === 'never-used';
-    const displayAgent = isNeutralStatus ? 'neutral' : agent;
-
-    const agentChanged = displayAgent !== currentAgent;
-
-    if (agentChanged) {
-      switchAgent(displayAgent, isWorking && !isNeutralStatus);
-    } else if (isWorking && !isNeutralStatus) {
-      if (!glyphTimer) startGlyphCycle(displayAgent);
-    } else {
-      stopGlyphCycle();
-      setIconFrame(displayAgent, iconsFor(displayAgent).idleGlyph);
+  /** Short stand-in for the percent cell itself, when there's no number to show yet. */
+  function statusWord(row) {
+    switch (row.status) {
+      case 'unauthenticated':
+        return 'sign in';
+      case 'error':
+        return 'offline';
+      case 'stale':
+        return 'stale';
+      default:
+        return null;
     }
+  }
 
-    iconEl.classList.toggle('working', isWorking && !isNeutralStatus);
-    iconEl.classList.toggle('idle', !isBusy || isNeutralStatus);
+  function makeIconEl(agentKey, sizeClass) {
+    const icons = iconsFor(agentKey);
+    const el = document.createElement('span');
+    el.className = `agent-icon ${sizeClass}`;
+    el.dataset.agent = agentKey;
+    if (icons.createMarkup) el.innerHTML = icons.createMarkup();
+    else el.textContent = icons.glyph;
+    return el;
+  }
 
-    barShimmerEl.classList.toggle('active', isWorking && !isNeutralStatus);
+  /**
+   * Keyed reconciliation: reuses an existing DOM node when its agent is
+   * still shown, even if its position changed, builds a fresh node only
+   * for an agent that just started being shown, and removes nodes for
+   * agents no longer shown. Existing nodes are repositioned via
+   * insertBefore rather than removed+readded, which does not interrupt
+   * their running CSS animations -- a purely order-sensitive key (e.g.
+   * comparing agent arrays by position) would treat every reorder as a
+   * full identity change and rebuild both rows, restarting their pulse/
+   * shimmer animations every tick two agents are simultaneously busy.
+   */
+  function reorderByKey(containerEl, controllers, desiredKeys, buildFn) {
+    const byKey = new Map(controllers.map((c) => [c.agentKey, c]));
+    const next = desiredKeys.map((key) => byKey.get(key) || buildFn(key));
 
-    const percent = isNeutralStatus ? null : state.percent;
-    const clamped = percent == null ? 0 : Math.max(0, Math.min(100, percent)) / 100;
-    barFillEl.style.transform = `scaleX(${clamped})`;
+    next.forEach((controller, i) => {
+      if (containerEl.children[i] !== controller.el) {
+        containerEl.insertBefore(controller.el, containerEl.children[i] || null);
+      }
+    });
 
-    const cls = thresholdClass(percent);
-    barFillEl.classList.toggle('amber', cls === 'amber');
-    barFillEl.classList.toggle('red', cls === 'red');
+    const nextKeys = new Set(desiredKeys);
+    controllers.forEach((c) => {
+      if (!nextKeys.has(c.agentKey)) c.el.remove();
+    });
 
-    pillEl.classList.toggle('danger', cls === 'red');
-    pillEl.classList.toggle('working', isWorking && !isNeutralStatus);
+    return next;
+  }
 
-    percentEl.textContent = fmtPercent(percent);
+  function reconcileCollapsed(rowStates) {
+    const keys = rowStates.map(keyOf);
+    collapsed = reorderByKey(collapsedRowEl, collapsed, keys, (agentKey) => ({
+      agentKey,
+      el: makeIconEl(agentKey, 'collapsed'),
+    }));
+    collapsed.forEach((c, i) => {
+      const working = rowStates[i].state === 'working';
+      c.el.classList.toggle('working', working);
+      c.el.classList.toggle('idle', !working);
+    });
+  }
 
+  function buildAgentRow(agentKey) {
+    const el = document.createElement('div');
+    el.className = 'agent-row';
+    el.style.setProperty('--row-color', iconsFor(agentKey).color);
+
+    const badgeEl = document.createElement('div');
+    badgeEl.className = 'badge';
+    badgeEl.appendChild(makeIconEl(agentKey, 'badge-icon'));
+
+    const trackEl = document.createElement('div');
+    trackEl.className = 'bar-track';
+    const fillEl = document.createElement('div');
+    fillEl.className = 'bar-fill';
+    const shimmerEl = document.createElement('div');
+    shimmerEl.className = 'bar-shimmer';
+    trackEl.appendChild(fillEl);
+    trackEl.appendChild(shimmerEl);
+
+    const percentEl = document.createElement('div');
+    percentEl.className = 'percent';
+
+    el.appendChild(badgeEl);
+    el.appendChild(trackEl);
+    el.appendChild(percentEl);
+
+    return { agentKey, el, badgeEl, fillEl, shimmerEl, percentEl };
+  }
+
+  function reconcileAgentRows(rowStates) {
+    const keys = rowStates.map(keyOf);
+    rows = reorderByKey(agentRowsEl, rows, keys, buildAgentRow);
+
+    let anyWorking = false;
+    let anyDanger = false;
+
+    rows.forEach((r, i) => {
+      const row = rowStates[i];
+      const working = row.state === 'working';
+      if (working) anyWorking = true;
+
+      const word = statusWord(row);
+      r.percentEl.textContent = word || fmtPercent(row.percent);
+      r.percentEl.classList.toggle('percent-status', !!word);
+
+      const clamped = row.percent == null ? 0 : Math.max(0, Math.min(100, row.percent)) / 100;
+      r.fillEl.style.transform = `scaleX(${clamped})`;
+
+      const cls = thresholdClass(row.percent);
+      r.fillEl.classList.toggle('amber', cls === 'amber');
+      r.fillEl.classList.toggle('red', cls === 'red');
+      if (cls === 'red') anyDanger = true;
+
+      r.shimmerEl.classList.toggle('active', working);
+      r.badgeEl.classList.toggle('working', working);
+    });
+
+    return { anyWorking, anyDanger };
+  }
+
+  function renderDetail(rowStates) {
+    if (rowStates.length !== 1) {
+      detailEl.textContent = '';
+      return;
+    }
+    const [row] = rowStates;
     const parts = [];
-    const note = statusNote(state);
+    const note = statusNote(row);
     if (note) parts.push(note);
-    const resetsIn = isNeutralStatus ? null : fmtResetsIn(state.resetsAt);
+    const resetsIn = fmtResetsIn(row.resetsAt);
     if (resetsIn) parts.push(resetsIn);
-    if (!isNeutralStatus && state.weeklyPercent != null) parts.push(`weekly ${Math.round(state.weeklyPercent)}%`);
-    if (!isNeutralStatus && state.planType) parts.push(state.planType);
+    if (row.weeklyPercent != null) parts.push(`weekly ${Math.round(row.weeklyPercent)}%`);
+    if (row.planType) parts.push(row.planType);
     detailEl.textContent = parts.join(' · ');
+  }
+
+  function render(state) {
+    const rowStates =
+      state.agents && state.agents.length
+        ? state.agents
+        : [{ agent: null, percent: null, resetsAt: null, weeklyPercent: null, planType: null, state: 'idle', status: 'never-used' }];
+
+    pillEl.classList.toggle('agents-2', rowStates.length === 2);
+    pillEl.classList.toggle('agents-1', rowStates.length === 1);
+
+    reconcileCollapsed(rowStates);
+    const { anyWorking, anyDanger } = reconcileAgentRows(rowStates);
+
+    pillEl.classList.toggle('working', anyWorking);
+    pillEl.classList.toggle('danger', anyDanger);
+
+    renderDetail(rowStates);
 
     lastState = state;
   }

@@ -18,10 +18,10 @@ const DRAG_IDLE_MS = 200;
  * "black box after a monitor hotplug" failure mode).
  *
  * The pill launches Dynamic-Island-style, top-center of the primary display,
- * and can be freely dragged (via its always-visible header row, not the
- * expanded detail view -- see pill.css's app-region rules) to anywhere on
- * any connected display, live-clamped to that display's work area on every
- * 'move' event. Its window is sized for
+ * and can be freely dragged (via its icon/bar surface in either collapsed
+ * or expanded state, not the free-text detail line -- see pill.css's
+ * app-region rules) to anywhere on any connected display, live-clamped to
+ * that display's work area on every 'move' event. Its window is sized for
  * the *expanded* state up front so the hover-to-expand grow-in-place
  * animation (handled entirely in CSS) is never clipped by the OS window
  * bounds.
@@ -48,7 +48,7 @@ function createPillWindow() {
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
-    movable: true, // draggable via -webkit-app-region:drag (pill.css), scoped to the collapsed pill surface
+    movable: true, // draggable via -webkit-app-region:drag (pill.css), scoped to the pill's icon/bar surface
 
     alwaysOnTop: true, // level corrected to 'screen-saver' below, after show
     skipTaskbar: true,
@@ -90,10 +90,16 @@ function createPillWindow() {
   }, REASSERT_INTERVAL_MS);
   win.on('closed', () => clearInterval(reassertTimer));
 
-  // Shared by revalidate() and the drag-clamp handler below so a
-  // programmatic setBounds() (ours) never re-enters as if it were a user
-  // drag -- both wrap their own setBounds call in this flag.
+  // Shared mutable state across the blocks below:
+  // - wasHovering: which rect (collapsed/expanded) is currently showing, so
+  //   clamping and hit-testing both target the pill the user can actually see.
+  // - clampGuard: set around every *programmatic* setBounds() call so it
+  //   never re-enters the 'move' handler below as if it were a user drag.
+  // - isDragging / dragIdleTimer: see the 'move' handler.
+  let wasHovering = false;
   let clampGuard = false;
+  let isDragging = false;
+  let dragIdleTimer = null;
 
   // display-metrics-changed fires far more often than an actual monitor
   // hotplug (DPI/scale change, taskbar auto-hide toggling, work-area
@@ -102,12 +108,14 @@ function createPillWindow() {
   // top-center -- a dragged pill must survive routine display churn, not
   // just live at a fixed spot. It also covers the actual hotplug case: if
   // the display the pill was on got removed, the nearest-point lookup lands
-  // it on the closest remaining display instead of off-screen.
+  // it on the closest remaining display instead of off-screen. Clamps the
+  // *visible pill* (clampWindowToVisiblePill), not the larger pre-sized
+  // window, so the hard stop lands where the user can actually see it.
   const revalidate = () => {
     if (win.isDestroyed()) return;
     const b = win.getBounds();
     const display = screen.getDisplayNearestPoint({ x: b.x + Math.floor(b.width / 2), y: b.y + Math.floor(b.height / 2) });
-    const clamped = ConfigStore.clampToWorkArea(b, display.workArea);
+    const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: wasHovering });
     clampGuard = true;
     win.setBounds(clamped);
     clampGuard = false;
@@ -124,8 +132,6 @@ function createPillWindow() {
   // so re-clamping on every event gives a hard stop at the work-area edge
   // with no elastic overshoot. setBounds() below re-triggers 'move' itself,
   // so clampGuard stops that from recursing.
-  let isDragging = false;
-  let dragIdleTimer = null;
   win.on('move', () => {
     if (clampGuard || win.isDestroyed()) return;
 
@@ -137,7 +143,7 @@ function createPillWindow() {
 
     const b = win.getBounds();
     const display = screen.getDisplayNearestPoint({ x: b.x + Math.floor(b.width / 2), y: b.y + Math.floor(b.height / 2) });
-    const clamped = ConfigStore.clampToWorkArea(b, display.workArea);
+    const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: wasHovering });
     if (clamped.x !== b.x || clamped.y !== b.y) {
       clampGuard = true;
       win.setBounds(clamped);
@@ -150,17 +156,25 @@ function createPillWindow() {
 
   // Hover-to-expand, detected from the main process: CSS :hover / renderer
   // DOM events are unreliable across the transparent surface on Windows, so
-  // this polls the cursor against the window bounds instead. The expanded
-  // detail row grows in place inside the same (already large enough)
-  // window, so the hover target is just the window's own bounds. Suppressed
-  // mid-drag so grabbing the pill can't also trigger the expand animation.
-  let wasHovering = false;
+  // this polls the cursor against the pill's own rect instead. The OS window
+  // is pre-sized for the *expanded* state (so the grow animation is never
+  // clipped), which is much larger than the collapsed pill -- hit-testing
+  // against the full window bounds would trigger expansion from well outside
+  // the visible pill. `wasHovering` also picks which rect to test: the small
+  // collapsed rect while collapsed (so only touching the pill expands it),
+  // the larger expanded rect once expanded (so it doesn't snap shut the
+  // moment the cursor drifts past the collapsed footprint). While a drag is
+  // in progress the hover state is frozen at whatever it was when the drag
+  // started, rather than re-tested: re-testing would both let a drag trigger
+  // a brand new expand mid-grab, and -- worse -- collapse an already-expanded
+  // card out from under the cursor the instant the drag begins (the card's
+  // own drag handle, .agent-rows, only exists while expanded).
   const hoverTimer = setInterval(() => {
     if (win.isDestroyed() || !win.isVisible()) return;
+    if (isDragging) return;
     const cursor = screen.getCursorScreenPoint();
-    const b = win.getBounds();
-    const inBounds = cursor.x >= b.x && cursor.x <= b.x + b.width && cursor.y >= b.y && cursor.y <= b.y + b.height;
-    const isHovering = inBounds && !isDragging;
+    const b = ConfigStore.pillHitRect(win.getBounds(), { expanded: wasHovering });
+    const isHovering = cursor.x >= b.x && cursor.x <= b.x + b.width && cursor.y >= b.y && cursor.y <= b.y + b.height;
     if (isHovering !== wasHovering) {
       wasHovering = isHovering;
       if (!win.isDestroyed()) win.webContents.send('pill:hover', isHovering);

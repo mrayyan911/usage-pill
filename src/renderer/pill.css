@@ -7,187 +7,226 @@ html, body {
 
 body {
   /* Deliberately no app-region:drag here -- the draggable surface is scoped
-     to .pill-inner (below) so the transparent letterboxing around the pill
-     never grabs the window. */
+     to .collapsed-icons/.agent-rows (below) so the transparent letterboxing
+     around the pill never grabs the window. */
   user-select: none;
   font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
   display: flex;
   justify-content: center;
 }
 
-/* Spring-style easing used everywhere the pill "grows" -- a slight
-   overshoot reads as alive rather than robotic. */
+/* No overshoot: expansion must stay within the transparent native window. */
 :root {
-  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .pill {
   position: relative;
   box-sizing: border-box;
-  width: 240px;
-  margin-top: 2px;
-  border-radius: 18px;
+  width: 84px;
+  margin-top: 6px;
+  border-radius: 20px;
   animation: pillAppear 0.2s var(--spring) both;
-  transition: width 0.42s var(--spring), border-radius 0.42s var(--spring);
+  transition: width 0.45s var(--spring), border-radius 0.45s var(--spring);
+}
+
+/* Two collapsed icons need a little more room than one. Height is never
+   set explicitly anywhere in this file -- it stays intrinsic, driven by
+   .pill-inner's grid content, exactly like the width-only expand below. */
+.pill.agents-2 {
+  width: 104px;
 }
 
 .pill.expanded {
-  width: 260px;
-  border-radius: 20px;
-}
-
-/* Outer ambient glow, tinted by the active agent's color. Must sit behind
-   .pill-inner and only bleed past its edges -- an inner glow would wash
-   over pill-inner's own background. Positioned boxes paint above
-   non-positioned in-flow ones regardless of source order, so pill-inner
-   needs its own explicit stacking (below) to actually occlude this. */
-.pill::before {
-  content: "";
-  position: absolute;
-  inset: -6px;
-  border-radius: inherit; /* always matches .pill's own radius -- compact or expanded */
-  background: var(--agent-color, #d97757);
-  filter: blur(10px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-  z-index: 0;
-}
-
-.pill.working::before {
-  animation: workingGlow 1.8s ease-in-out infinite;
-}
-
-@keyframes workingGlow {
-  0%, 100% { opacity: 0.12; }
-  50% { opacity: 0.32; }
-}
-
-/* Danger-threshold border pulse, done as an opacity-only pseudo-element so
-   the continuous animation never touches box-shadow/border on the real
-   element (that would force per-frame raster of the transparent surface). */
-.pill::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  border: 2px solid #e5484d;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 2; /* stays above pill-inner -- this one IS meant to overlay the card */
-}
-.pill.danger::after {
-  animation: borderPulseOpacity 2s ease-in-out infinite;
+  width: 248px;
+  border-radius: 25px;
 }
 
 @keyframes pillAppear {
-  from { opacity: 0; transform: scale(0.9) translateY(-6px); }
+  from { opacity: 0; transform: scale(0.88) translateY(-6px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-@keyframes borderPulseOpacity {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 0.65; }
-}
-
-/* The actual clipped/rounded surface. Grid-row morph is what makes the
-   detail row grow in place ("dynamic island" expand) instead of a separate
-   floating tooltip -- 0fr collapses it to nothing, 1fr reveals it at its
-   natural content height, and the fr-value transition animates smoothly. */
+/* Padding belongs inside each collapsible grid row: padding on the grid
+   item itself would prevent a 0fr row from fully disappearing. */
 .pill-inner {
-  position: relative; /* required for z-index to take effect */
-  z-index: 1; /* paints above .pill::before so its opaque background actually occludes the glow, which then only shows in the -6px bleed past this box's edges */
   box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 36px 0fr;
+  grid-template-rows: 1fr 0fr;
   border-radius: inherit;
   overflow: hidden;
-  background: rgba(14, 14, 16, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: grid-template-rows 0.42s var(--spring);
+  background: #050505;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  transition: grid-template-rows 0.45s var(--spring);
 }
 
 .pill.expanded .pill-inner {
-  grid-template-rows: 36px 1fr;
+  grid-template-rows: 0fr 1fr;
 }
 
-.pill-row {
+/* Collapsed strip: just the agent icon(s), centered -- the small resting
+   island. Swapped out for .expanded-card on hover, not stacked above it, so
+   the compact icons fully vanish rather than leaving a gap. */
+.collapsed-row {
   min-height: 0;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.18s ease;
+}
+
+.collapsed-icons {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 0 14px;
-  /* Native OS window drag, scoped to this row (the always-visible collapsed
-     surface) so it stays grabbable even once .expanded -- .detail-row below
-     is deliberately excluded. Scoping to the whole window would let the
-     150ms hover-to-expand poll (window.js) win the race against mousedown
-     and revoke the drag handle before the user can grab it. */
+  padding: 7px 16px;
+  /* Native OS window drag, scoped to the icon/bar surface (this row and
+     .agent-rows below), never .detail -- see window.js's file doc comment.
+     Scoping to the whole window would let the 150ms hover-to-expand poll
+     win the race against mousedown and revoke the drag handle before the
+     user can grab it; scoping to only one of collapsed/expanded would lose
+     the handle entirely once the other state is showing, since the two are
+     swapped in/out rather than one growing out of the other. */
   -webkit-app-region: drag;
   cursor: grab;
 }
 
-.pill-row:active {
+.collapsed-icons:active {
   /* Best-effort only: on Windows, the OS takes over cursor handling for the
      duration of an app-region drag, so this mostly shows pre-drag. */
   cursor: grabbing;
 }
 
-.icon-wrap {
+.pill.expanded .collapsed-row {
+  opacity: 0;
+}
+
+.agent-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 13px; /* only matters for the neutral em-dash glyph -- real icons are sized SVGs */
+  color: var(--row-color, #7a7a7e);
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.agent-icon svg {
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 0.7px 0.5px rgba(0, 0, 0, 0.65));
+}
+
+.agent-icon.collapsed {
+  width: 20px;
+  height: 20px;
+}
+
+.agent-icon.badge-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Claude's wide pixel mark occupies only 15 of its 24 viewBox units
+   vertically; a slightly wider SVG balances the round Codex mark. */
+.agent-icon[data-agent="claude"] svg { width: 17px; height: 17px; }
+.agent-icon[data-agent="codex"] svg { width: 14px; height: 14px; }
+
+.agent-icon.collapsed .icon-bevel { opacity: 0.4; }
+.agent-icon.collapsed .icon-depth { opacity: 0.65; }
+.agent-icon.badge-icon .icon-bevel { opacity: 0.8; }
+
+.agent-icon.collapsed.idle {
+  opacity: 0.62;
+}
+
+.agent-icon.collapsed.working {
+  animation: iconPulse 1.1s var(--spring) infinite;
+}
+
+@keyframes iconPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.04); opacity: 0.72; }
+}
+
+/* Expanded card: one row per agent (two only when both agents are busy at
+   once, see reduce.js), plus an optional detail line for the single-agent
+   case. */
+.expanded-card {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.expanded-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+}
+
+.expanded-content:has(.detail:not(:empty)) {
+  padding-block: 12px;
+}
+
+.agent-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  -webkit-app-region: drag;
+  cursor: grab;
+}
+
+.agent-rows:active {
+  cursor: grabbing;
+}
+
+.agent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.24s ease 0.08s, transform 0.32s var(--spring) 0.08s;
+}
+
+.pill.expanded .agent-row {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Second row lags the first slightly on the way in -- a small stagger
+   reads as "these arrived together" rather than a single flat pop. */
+.agent-rows > .agent-row:nth-child(2) {
+  transition-delay: 0.16s;
+}
+
+.badge {
+  position: relative;
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--agent-color, #d97757);
-  transform-origin: center;
-  will-change: transform;
-  opacity: 1;
-  transition: opacity 0.26s ease, color 0.26s ease, transform 0.26s ease;
+.badge.working {
+  animation: badgePulse 1.1s var(--spring) infinite;
 }
 
-.icon svg {
-  display: block;
-  width: 16px;
-  height: 14px;
-  image-rendering: pixelated;
-}
-
-.icon.idle {
-  opacity: 0.55;
-}
-
-/* 0.56s = 4 walk-cycle frames at 140ms each (see GLYPH_INTERVAL_MS in
-   pill.js) -- the bounce peak lands on the same beat as each footstep. */
-.icon.working {
-  animation: iconBounce 0.56s var(--spring) infinite;
-}
-
-.icon.switching {
-  opacity: 0;
-  transform: translateX(-4px);
-}
-
-@keyframes iconBounce {
-  0%, 100% { transform: translateY(0) scale(1, 1); }
-  40% { transform: translateY(-3px) scale(1.05, 0.95); }
-  70% { transform: translateY(0.5px) scale(0.97, 1.03); }
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); opacity: 0.72; }
 }
 
 .bar-track {
   flex: 1 1 auto;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.1);
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
   position: relative;
   overflow: hidden;
 }
@@ -198,8 +237,9 @@ body {
   top: 0;
   height: 100%;
   width: 100%;
-  border-radius: 2px;
-  background-color: var(--agent-color, #d97757);
+  border-radius: 3px;
+  background-color: var(--row-color, #d97757);
+  opacity: 0.8;
   transform-origin: left center;
   transform: scaleX(0); /* animate scaleX, never width -- compositor-only */
   will-change: transform;
@@ -223,7 +263,7 @@ body {
   left: 0;
   height: 100%;
   width: 40%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
   opacity: 0;
   transform: translateX(-120%);
   will-change: transform, opacity;
@@ -241,39 +281,47 @@ body {
 
 .percent {
   flex: 0 0 auto;
-  min-width: 2.4em;
+  min-width: 2.6em;
   text-align: right;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.72);
 }
 
-.detail-row {
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
+/* A status word (e.g. "sign in", "stale") stands in for a percent that
+   doesn't exist yet -- styled distinctly so it never reads as a number. */
+.percent.percent-status {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .detail {
-  min-width: 0;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 14px;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.6);
   white-space: normal;
   overflow-wrap: anywhere;
-  /* Three lines plus the main row fit within the 86px native window.
-     Unusually long provider plan names remain available by scrolling. */
-  max-height: 42px;
+  max-height: 28px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
-  opacity: 0;
-  transition: opacity 0.2s ease 0.14s;
 }
 
-.pill.expanded .detail {
-  opacity: 1;
-  padding-bottom: 4px;
+/* Only rendered for the single-agent case (see pill.js) -- when both
+   agents are shown the card stays two clean rows with no detail line, so
+   :empty collapsing it back out of the flex column leaves no gap. */
+.detail:empty {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .bar-shimmer { display: none; }
 }

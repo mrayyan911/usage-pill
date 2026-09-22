@@ -5,39 +5,62 @@
  * getters into the single shape the renderer consumes. Kept separate from
  * the timers/IO in index.js so it's trivially unit-testable.
  *
+ * Reports one agent row normally (whichever is active, matching the prior
+ * single-agent behavior), but reports BOTH when Claude and Codex are busy
+ * at the same time -- that's the only condition the Dynamic-Island-style
+ * two-row expanded view exists for. `primary` stays the busier/most
+ * recently touched agent (ActivityStore's own mtime tie-break), used by the
+ * renderer for the collapsed pill's ambient glow color and row ordering.
+ *
  * @param {{active:'claude'|'codex'|null, claude:string, codex:string}} activitySnapshot
  * @param {object} claudeUsage from UsageStore.getClaudeUsage()
  * @param {object} codexUsage from UsageStore.getCodexUsage()
- * @returns {{agent:'claude'|'codex'|null, percent:number|null, resetsAt:string|null,
- *   weeklyPercent:number|null, planType:string|null, state:string, status:string}}
+ * @returns {{agents:Array<{agent:string|null,percent:number|null,resetsAt:string|null,
+ *   weeklyPercent:number|null,planType:string|null,state:string,status:string}>,
+ *   primary:'claude'|'codex'|null}}
  */
 function reduce({ activitySnapshot, claudeUsage, codexUsage }) {
-  const active = activitySnapshot.active;
+  const { active, claude: claudeState, codex: codexState } = activitySnapshot;
 
   if (!active) {
     return {
-      agent: null,
-      percent: null,
-      resetsAt: null,
-      weeklyPercent: null,
-      planType: null,
-      state: 'idle',
-      status: 'never-used',
+      agents: [
+        {
+          agent: null,
+          percent: null,
+          resetsAt: null,
+          weeklyPercent: null,
+          planType: null,
+          state: 'idle',
+          status: 'never-used',
+        },
+      ],
+      primary: null,
     };
   }
 
-  const usage = active === 'claude' ? claudeUsage : codexUsage;
-  const state = activitySnapshot[active];
-
-  return {
-    agent: active,
+  const entry = (agent, usage, state) => ({
+    agent,
     percent: usage.percent,
-    resetsAt: usage.resetsAt instanceof Date ? usage.resetsAt.toISOString() : null,
+    resetsAt: usage.resetsAt instanceof Date ? usage.resetsAt.toISOString() : usage.resetsAt,
     weeklyPercent: usage.weeklyPercent,
     planType: usage.planType,
     state,
     status: usage.status,
-  };
+  });
+
+  const claudeEntry = entry('claude', claudeUsage, claudeState);
+  const codexEntry = entry('codex', codexUsage, codexState);
+  const isBusy = (state) => state === 'working' || state === 'blocked';
+
+  const agents =
+    isBusy(claudeState) && isBusy(codexState)
+      ? active === 'claude'
+        ? [claudeEntry, codexEntry]
+        : [codexEntry, claudeEntry]
+      : [active === 'claude' ? claudeEntry : codexEntry];
+
+  return { agents, primary: active };
 }
 
 /**
