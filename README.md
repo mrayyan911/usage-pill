@@ -10,6 +10,15 @@ anywhere on any connected display, collapsed or expanded; it hard-stops at
 the edge of whichever display it's currently over, and reopens at that same
 spot next launch (falling back to top-center if that display's gone).
 
+Click an agent icon to inspect its activity, reset time, weekly usage, and
+plan. When two agents are shown, **← Both** returns to the two-row view.
+A small **!** marks an agent waiting for approval. Stale readings retain
+their last percentage with a separate freshness label.
+
+For keyboard access, choose **Show usage details** from the tray, then use
+Tab and Enter to inspect an agent. Press Escape or focus another window to
+close the details. Drag using the bar area; the expanded icons are buttons.
+
 ## Run it
 
 ```
@@ -33,7 +42,7 @@ npm run setup:remove   # unregister it
 ```
 
 A tray icon offers **Pause automatic display**, **Resume**, **Show preview**,
-and **Quit**. Scripted runs (`codex exec`, `claude -p`) count as sessions;
+**Show usage details**, and **Quit**. Scripted runs (`codex exec`, `claude -p`) count as sessions;
 `--help`/`--version`/utility subcommands and Claude Desktop do not.
 
 `npm run setup`/`npm run setup:remove` register/unregister a login item on
@@ -56,7 +65,7 @@ below).
 npm test
 ```
 
-130 unit tests cover the parsers (against scrubbed captured payload fixtures),
+143 unit tests cover the parsers (against scrubbed captured payload fixtures),
 the activity-log state machine, launch-position/drag-clamp/hover hit-test
 bounds math, saved-position load/save round-tripping, the activity store's
 sticky dual-agent selection and busy-agent handoff preference, the reducer

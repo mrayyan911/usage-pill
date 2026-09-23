@@ -5,8 +5,14 @@
   const collapsedRowEl = document.getElementById('collapsedRow');
   const agentRowsEl = document.getElementById('agentRows');
   const detailEl = document.getElementById('detail');
+  const backEl = document.getElementById('backToAgents');
+  const expandedCardEl = document.querySelector('.expanded-card');
 
   let lastState = null;
+  // These three always travel together to decide whether the card is
+  // expanded and which agent it's showing, so they're one interaction object
+  // rather than three separately-updated globals.
+  const interaction = { selectedAgent: null, hovering: false, inspecting: false };
   // Persistent per-agent-identity DOM refs, reused across ticks so an
   // in-place percent/state update never restarts a running CSS animation
   // (working pulse, shimmer sweep) -- a node is only rebuilt when the
@@ -49,33 +55,54 @@
     return `resets in ${m}m`;
   }
 
+  // Single source of truth for what each usage status means, so a new status
+  // (or a change to an existing one) only needs updating here rather than in
+  // statusNote/statusWord/the freshness-tag assignment separately.
+  const STATUS_META = {
+    unauthenticated: { note: 'sign in to Claude Code', word: 'sign in' },
+    stale: { note: 'connection lost — showing last known value', word: 'stale', freshnessLabel: 'stale' },
+    error: { note: 'temporarily unavailable', word: 'unavailable', freshnessLabel: 'unavailable' },
+    'never-used': { note: 'no usage yet' },
+  };
+
   function statusNote(row) {
-    switch (row.status) {
-      case 'unauthenticated':
-        return 'sign in to Claude Code';
-      case 'stale':
-        return 'connection lost — showing last known value';
-      case 'error':
-        return 'temporarily unavailable';
-      case 'never-used':
-        return 'no usage yet';
-      default:
-        return null;
-    }
+    return STATUS_META[row.status]?.note ?? null;
   }
 
   /** Short stand-in for the percent cell itself, when there's no number to show yet. */
   function statusWord(row) {
-    switch (row.status) {
-      case 'unauthenticated':
-        return 'sign in';
-      case 'error':
-        return 'unavailable';
-      case 'stale':
-        return 'stale';
-      default:
-        return null;
-    }
+    if (row.percent != null && (row.status === 'stale' || row.status === 'error')) return null;
+    return STATUS_META[row.status]?.word ?? null;
+  }
+
+  /** The small freshness tag shown alongside a retained percent for a stale/errored reading. */
+  function freshnessLabel(row) {
+    return row.percent == null ? '' : STATUS_META[row.status]?.freshnessLabel ?? '';
+  }
+
+  function agentName(row) {
+    return row.agent === 'claude' ? 'Claude' : row.agent === 'codex' ? 'Codex' : 'No active agent';
+  }
+
+  function activityLabel(row) {
+    return row.state === 'blocked' ? 'Needs approval' : row.state === 'working' ? 'Working' : 'Idle';
+  }
+
+  /** resetsIn/weekly/plan, in display order -- shared between the compact badge label and the detail line. */
+  function commonFacts(row) {
+    return [fmtResetsIn(row.resetsAt), row.weeklyPercent == null ? null : `weekly ${Math.round(row.weeklyPercent)}%`, row.planType];
+  }
+
+  function description(row) {
+    return [agentName(row), activityLabel(row), row.percent == null ? statusWord(row) : `${fmtPercent(row.percent)} used`,
+      statusNote(row), ...commonFacts(row)].filter(Boolean).join(' · ');
+  }
+
+  function updateExpansion() {
+    const expanded = !!lastState && (interaction.hovering || interaction.inspecting);
+    pillEl.classList.toggle('expanded', expanded);
+    expandedCardEl.inert = !expanded;
+    window.usagePill.setExpanded(expanded);
   }
 
   function makeIconEl(agentKey, sizeClass) {
@@ -127,6 +154,9 @@
       const working = rowStates[i].state === 'working';
       c.el.classList.toggle('working', working);
       c.el.classList.toggle('idle', !working);
+      c.el.classList.toggle('blocked', rowStates[i].state === 'blocked');
+      c.el.setAttribute('role', 'img');
+      c.el.setAttribute('aria-label', `${agentName(rowStates[i])}, ${activityLabel(rowStates[i])}`);
     });
   }
 
@@ -135,9 +165,14 @@
     el.className = 'agent-row';
     el.style.setProperty('--row-color', iconsFor(agentKey).color);
 
-    const badgeEl = document.createElement('div');
+    const badgeEl = document.createElement('button');
+    badgeEl.type = 'button';
     badgeEl.className = 'badge';
     badgeEl.appendChild(makeIconEl(agentKey, 'badge-icon'));
+    badgeEl.addEventListener('click', () => {
+      interaction.selectedAgent = interaction.selectedAgent === agentKey ? null : agentKey;
+      render(lastState);
+    });
 
     const trackEl = document.createElement('div');
     trackEl.className = 'bar-track';
@@ -150,12 +185,17 @@
 
     const percentEl = document.createElement('div');
     percentEl.className = 'percent';
+    const usageEl = document.createElement('div');
+    usageEl.className = 'usage-value';
+    const freshnessEl = document.createElement('span');
+    freshnessEl.className = 'freshness';
+    usageEl.append(percentEl, freshnessEl);
 
     el.appendChild(badgeEl);
     el.appendChild(trackEl);
-    el.appendChild(percentEl);
+    el.appendChild(usageEl);
 
-    return { agentKey, el, badgeEl, fillEl, shimmerEl, percentEl };
+    return { agentKey, el, badgeEl, fillEl, shimmerEl, percentEl, freshnessEl };
   }
 
   function reconcileAgentRows(rowStates) {
@@ -173,6 +213,14 @@
       const word = statusWord(row);
       r.percentEl.textContent = word || fmtPercent(row.percent);
       r.percentEl.classList.toggle('percent-status', !!word);
+      r.freshnessEl.textContent = freshnessLabel(row);
+      r.el.hidden = interaction.selectedAgent != null && interaction.selectedAgent !== keyOf(row);
+      r.badgeEl.classList.toggle('blocked', row.state === 'blocked');
+      r.badgeEl.setAttribute('aria-label', `${description(row)}. Show details`);
+      r.badgeEl.setAttribute('aria-pressed', String(interaction.selectedAgent === keyOf(row)));
+      r.badgeEl.title = description(row);
+      r.el.setAttribute('role', 'group');
+      r.el.setAttribute('aria-label', description(row));
 
       const clamped = row.percent == null ? 0 : Math.max(0, Math.min(100, row.percent)) / 100;
       r.fillEl.style.transform = `scaleX(${clamped})`;
@@ -190,22 +238,48 @@
   }
 
   function renderDetail(rowStates) {
-    if (rowStates.length !== 1) {
+    const selected = rowStates.find(row => keyOf(row) === interaction.selectedAgent);
+    backEl.hidden = !(selected && rowStates.length > 1);
+    if (rowStates.length !== 1 && !selected) {
       detailEl.textContent = '';
       return;
     }
-    const [row] = rowStates;
-    const parts = [];
+    const row = selected || rowStates[0];
     const note = statusNote(row);
-    if (note) parts.push(note);
-    const resetsIn = fmtResetsIn(row.resetsAt);
-    if (resetsIn) parts.push(resetsIn);
-    if (row.weeklyPercent != null) parts.push(`weekly ${Math.round(row.weeklyPercent)}%`);
-    if (row.planType) parts.push(row.planType);
-    detailEl.textContent = parts.join(' · ');
+    const parts = [
+      selected || row.state === 'blocked' ? `${agentName(row)} · ${activityLabel(row)}` : null,
+      !selected ? note : null,
+      ...commonFacts(row),
+      selected ? note : null,
+    ];
+    detailEl.textContent = parts.filter(Boolean).join(' · ');
+    detailEl.title = detailEl.textContent;
+  }
+
+  /**
+   * A repaint can hide or move the row whose badge holds keyboard focus (the
+   * agent stopped being shown, or reconcileAgentRows() hid it via selection).
+   * Restores focus to that agent's badge if it's still shown, else the first
+   * visible one, so a keyboard-driven inspection never silently loses focus.
+   */
+  function preserveFocusAcrossRender(focusedControl, hadFocus, focusedAgentKey) {
+    if (!interaction.inspecting || !hadFocus) return;
+    // checkVisibility() reads computed style (display/opacity/visibility),
+    // not layout geometry, so it never forces the synchronous reflow
+    // getClientRects() would right after render()'s own batch of DOM
+    // writes -- and unlike checking row.el.hidden, it's correct for every
+    // focusable control (badge, Back, the scrollable detail text), not
+    // only ones that map to an agent row.
+    const stillFocused = focusedControl.isConnected && focusedControl.checkVisibility() && document.activeElement === focusedControl;
+    if (stillFocused) return;
+    const replacement = rows.find(row => !row.el.hidden && row.agentKey === focusedAgentKey) || rows.find(row => !row.el.hidden);
+    replacement?.badgeEl.focus();
   }
 
   function render(state) {
+    const focusedControl = document.activeElement;
+    const hadFocus = pillEl.contains(focusedControl);
+    const focusedAgentKey = rows.find(row => row.badgeEl === focusedControl)?.agentKey;
     const rowStates =
       state.agents && state.agents.length
         ? state.agents
@@ -213,6 +287,7 @@
 
     pillEl.classList.toggle('agents-2', rowStates.length === 2);
     pillEl.classList.toggle('agents-1', rowStates.length === 1);
+    if (!rowStates.some(row => keyOf(row) === interaction.selectedAgent)) interaction.selectedAgent = null;
 
     reconcileCollapsed(rowStates);
     const { anyWorking, anyDanger } = reconcileAgentRows(rowStates);
@@ -223,12 +298,47 @@
     renderDetail(rowStates);
 
     lastState = state;
+    updateExpansion();
+    preserveFocusAcrossRender(focusedControl, hadFocus, focusedAgentKey);
   }
 
+  backEl.addEventListener('click', () => {
+    const previous = interaction.selectedAgent;
+    interaction.selectedAgent = null;
+    render(lastState);
+    rows.find(row => row.agentKey === previous)?.badgeEl.focus();
+  });
+  pillEl.addEventListener('focusin', () => { interaction.inspecting = true; updateExpansion(); });
+  pillEl.addEventListener('focusout', () => {
+    queueMicrotask(() => {
+      if (!pillEl.contains(document.activeElement)) { interaction.inspecting = false; updateExpansion(); }
+    });
+  });
+  function closeDetails() {
+    interaction.inspecting = false;
+    interaction.hovering = false;
+    interaction.selectedAgent = null;
+    if (pillEl.contains(document.activeElement)) document.activeElement.blur();
+    if (lastState) render(lastState);
+  }
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { event.preventDefault(); closeDetails(); }
+  });
+  window.addEventListener('blur', closeDetails);
+  window.usagePill.onInspect(() => {
+    interaction.inspecting = true;
+    updateExpansion();
+    rows.find(row => !row.el.hidden)?.badgeEl.focus();
+  });
   window.usagePill.onState(render);
   window.usagePill.onHover((isHovering) => {
     // Grows the pill in place (CSS grid-row morph) rather than showing a
     // separate floating tooltip -- the "dynamic island" expand.
-    pillEl.classList.toggle('expanded', isHovering && !!lastState);
+    interaction.hovering = isHovering;
+    if (!interaction.hovering && !interaction.inspecting) {
+      interaction.selectedAgent = null;
+      if (lastState) render(lastState);
+    }
+    updateExpansion();
   });
 })();

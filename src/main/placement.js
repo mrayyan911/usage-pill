@@ -22,16 +22,25 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
     };
 
     // Shared mutable state across the blocks below:
-    // - wasHovering: which rect (collapsed/expanded) is currently showing, so
-    //   clamping and hit-testing both target the pill the user can actually see.
+    // - wasHovering / isExpanded: which rect (collapsed/expanded) is currently
+    //   showing, so clamping and hit-testing both target the pill the user can
+    //   actually see. isExpanded also tracks keyboard-driven expansion (via the
+    //   'pill:expanded' IPC below), which can outlast pointer hover.
     // - clampGuard: set around every *programmatic* setBounds() call so it
     //   never re-enters the 'move' handler below as if it were a user drag.
     // - isDragging / dragIdleTimer: see the 'move' handler.
     let wasHovering = false;
+    let isExpanded = false;
     let clampGuard = false;
     let isDragging = false;
     let dragIdleTimer = null;
     let menuOpen = false;
+
+    // Keyboard inspection can outlast pointer hover; native drag bounds must
+    // follow the renderer's actual expansion, including Escape dismissal.
+    listen(win.webContents, 'ipc-message', (_event, channel, expanded) => {
+      if (channel === 'pill:expanded' && typeof expanded === 'boolean') isExpanded = expanded;
+    });
 
     const restoreDefaultPosition = () => {
       // A pending drag save must not recreate the position after a reset.
@@ -66,7 +75,7 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
     });
     listen(win.webContents, 'context-menu', (_event, params) => {
       const bounds = win.getBounds();
-      const rect = ConfigStore.pillHitRect(bounds, { expanded: wasHovering });
+      const rect = ConfigStore.pillHitRect(bounds, { expanded: isExpanded });
       const x = bounds.x + params.x;
       const y = bounds.y + params.y;
       if (x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height) {
@@ -106,7 +115,7 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
       if (win.isDestroyed()) return;
       const b = win.getBounds();
       const display = nearestDisplayFor(b);
-      const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: wasHovering });
+      const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: isExpanded });
       clampGuard = true;
       win.setBounds(clamped);
       clampGuard = false;
@@ -151,7 +160,7 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
 
       const b = win.getBounds();
       const display = nearestDisplayFor(b);
-      const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: wasHovering });
+      const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: isExpanded });
       if (clamped.x !== b.x || clamped.y !== b.y) {
         clampGuard = true;
         win.setBounds(clamped);
@@ -165,7 +174,7 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
     // is pre-sized for the *expanded* state (so the grow animation is never
     // clipped), which is much larger than the collapsed pill -- hit-testing
     // against the full window bounds would trigger expansion from well outside
-    // the visible pill. `wasHovering` also picks which rect to test: the small
+    // the visible pill. `isExpanded` also picks which rect to test: the small
     // collapsed rect while collapsed (so only touching the pill expands it),
     // the larger expanded rect once expanded (so it doesn't snap shut the
     // moment the cursor drifts past the collapsed footprint). While a drag is
@@ -178,10 +187,18 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
       if (win.isDestroyed() || !win.isVisible()) return;
       if (isDragging || menuOpen) return;
       const cursor = screen.getCursorScreenPoint();
-      const b = ConfigStore.pillHitRect(win.getBounds(), { expanded: wasHovering });
+      const b = ConfigStore.pillHitRect(win.getBounds(), { expanded: isExpanded });
       const isHovering = cursor.x >= b.x && cursor.x <= b.x + b.width && cursor.y >= b.y && cursor.y <= b.y + b.height;
       if (isHovering !== wasHovering) {
         wasHovering = isHovering;
+        // Optimistic guess so the *next* poll tick's hit-test already uses the
+        // right rect instead of waiting a full round trip. If keyboard
+        // inspection is what's actually keeping the card expanded, this can
+        // momentarily disagree with the renderer -- but 'pill:hover' below
+        // drives the renderer's own updateExpansion(), which always replies
+        // with the true value over the 'pill:expanded' IPC handled above, so
+        // it corrects itself within the same tick.
+        isExpanded = isHovering;
         if (!win.isDestroyed()) win.webContents.send('pill:hover', isHovering);
       }
     }, HOVER_POLL_MS);

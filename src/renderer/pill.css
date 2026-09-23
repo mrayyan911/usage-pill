@@ -114,6 +114,7 @@ body {
 }
 
 .agent-icon {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -150,7 +151,26 @@ body {
 .agent-icon.badge-icon .icon-bevel { opacity: 0.8; }
 
 .agent-icon.collapsed.idle {
-  opacity: 0.62;
+  opacity: 0.76;
+}
+
+.agent-icon.collapsed[data-agent="claude"].idle { opacity: 0.9; }
+
+.agent-icon.collapsed.blocked { opacity: 1; }
+
+.collapsed.blocked::after, .badge.blocked::after {
+  content: '!';
+  position: absolute;
+  right: -3px;
+  top: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: #e7b56c;
+  color: #17100a;
+  font: 700 8px/9px "Segoe UI", sans-serif;
+  text-align: center;
+  box-shadow: 0 0 0 2px #050505;
 }
 
 .agent-icon.collapsed.working {
@@ -162,9 +182,8 @@ body {
   50% { transform: scale(1.04); opacity: 0.72; }
 }
 
-/* Expanded card: one row per agent (two only when both agents are busy at
-   once, see reduce.js), plus an optional detail line for the single-agent
-   case. */
+/* Selecting one agent reuses the single-row footprint so details never
+   outgrow the fixed transparent window. */
 .expanded-card {
   min-height: 0;
   overflow: hidden;
@@ -206,6 +225,8 @@ body {
   transition: opacity 0.24s ease 0.08s, transform 0.32s var(--spring) 0.08s;
 }
 
+[hidden] { display: none; }
+
 .pill.expanded .agent-row {
   opacity: 1;
   transform: translateY(0);
@@ -225,7 +246,21 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
 }
+
+.badge:hover { background: rgba(255, 255, 255, 0.08); }
+.badge:focus-visible, .back-button:focus-visible, .detail:focus-visible {
+  outline: 1px solid #d4b798;
+  outline-offset: 2px;
+}
+.badge[aria-pressed="true"] { background: rgba(255, 255, 255, 0.08); }
 
 .badge.working {
   animation: badgePulse 1.1s var(--spring) infinite;
@@ -303,6 +338,42 @@ body {
   color: rgba(255, 255, 255, 0.72);
 }
 
+.usage-value {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  line-height: 11px;
+}
+
+.freshness {
+  font-size: 9px;
+  line-height: 9px;
+  color: #baa98f;
+}
+.freshness:empty { display: none; }
+
+.detail-line {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  -webkit-app-region: no-drag;
+}
+.detail-line:has(.detail:empty):has(.back-button[hidden]) { display: none; }
+
+.back-button {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #d6c2ac;
+  font: 500 10px/14px "Segoe UI", sans-serif;
+  cursor: pointer;
+}
+.back-button:hover { color: #fff; }
+
 /* A status word (e.g. "sign in", "stale") stands in for a percent that
    doesn't exist yet -- styled distinctly so it never reads as a number. */
 .percent.percent-status {
@@ -314,6 +385,8 @@ body {
 }
 
 .detail {
+  min-width: 0;
+  flex: 1;
   font-size: 11px;
   line-height: 14px;
   color: rgba(255, 255, 255, 0.6);
@@ -325,9 +398,6 @@ body {
   scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
 }
 
-/* Only rendered for the single-agent case (see pill.js) -- when both
-   agents are shown the card stays two clean rows with no detail line, so
-   :empty collapsing it back out of the flex column leaves no gap. */
 .detail:empty {
   display: none;
 }

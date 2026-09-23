@@ -78,7 +78,18 @@ function main() {
     tray?.update();
     if (process.env.USAGE_PILL_DEBUG === '1') console.log('VISIBILITY', JSON.stringify(state));
   } });
-  tray = createTray(controller, () => app.quit());
+  tray = createTray(controller, () => app.quit(), () => {
+    controller.showPreview();
+    // Unlike every other path here, this one is a keyboard entry point: the
+    // renderer's 'pill:inspect' handler focuses a badge, which only works if
+    // the OS actually gives the window input focus -- showPreview() alone
+    // uses showInactive() so hover-preview never steals focus, which would be
+    // wrong here.
+    if (win.isDestroyed()) return;
+    win.show();
+    win.focus();
+    win.webContents.send('pill:inspect');
+  });
   win.once('ready-to-show', () => {
     ready = true;
     controller.setReady();

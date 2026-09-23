@@ -13,13 +13,16 @@ async function launch(argv = ['electron', '.','--monitor'], { loginError } = {})
   Object.assign(app, { commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => Promise.resolve(), quit() { app.emit('before-quit'); }, exit(code) { exitCode = code; } });
   const win = new EventEmitter();
   let visible = false;
+  let focused = false;
+  let destroyed = false;
   let driverRunning = false;
   const messages = [];
-  Object.assign(win, { isDestroyed: () => false, isVisible: () => visible, showInactive() { visible = true; }, hide() { visible = false; }, setAlwaysOnTop() {}, webContents: Object.assign(new EventEmitter(), { send: (...args) => messages.push(args) }) });
+  Object.assign(win, { isDestroyed: () => destroyed, isVisible: () => visible, showInactive() { visible = true; }, show() { visible = true; }, focus() { focused = true; }, hide() { visible = false; }, setAlwaysOnTop() {}, webContents: Object.assign(new EventEmitter(), { send: (...args) => messages.push(args) }) });
   let updateSessions;
   let stopped = false;
   let controller;
   let setup;
+  let inspect;
   const modules = {
     electron: { app },
     './window': { createPillWindow: ({ autoShow } = {}) => { if (autoShow !== false) visible = true; return win; }, ALWAYS_ON_TOP_LEVEL: 'screen-saver' },
@@ -36,7 +39,7 @@ async function launch(argv = ['electron', '.','--monitor'], { loginError } = {})
     } },
     './mock': { MockDriver: class {} },
     './visibility': { VisibilityController },
-    './tray': { createTray: value => { controller = value; return { update() {}, destroy() {} }; } },
+    './tray': { createTray: (value, _quit, inspectCallback) => { controller = value; inspect = inspectCallback; return { update() {}, destroy() {} }; } },
     './login': { configureLogin: (_app, enabled) => { setup = enabled; if (loginError) throw loginError; } },
   };
   vm.runInNewContext(fs.readFileSync(require.resolve('../src/main/index'), 'utf8'), {
@@ -44,7 +47,7 @@ async function launch(argv = ['electron', '.','--monitor'], { loginError } = {})
     process: { argv, env: {}, platform: 'win32', exitCode: 0 }, console: { ...console, error() {} },
   });
   await new Promise(resolve => setImmediate(resolve));
-  return { app, win, messages, get visible() { return visible; }, get running() { return driverRunning; }, get stopped() { return stopped; }, get setup() { return setup; }, get controller() { return controller; }, get exitCode() { return exitCode; }, sessions: agents => updateSessions({ agents, status: 'ok' }) };
+  return { app, win, messages, get visible() { return visible; }, get focused() { return focused; }, destroy() { destroyed = true; }, get running() { return driverRunning; }, get stopped() { return stopped; }, get setup() { return setup; }, get controller() { return controller; }, get exitCode() { return exitCode; }, inspect: () => inspect(), sessions: agents => updateSessions({ agents, status: 'ok' }) };
 }
 
 test('monitor stays hidden until ready and a session opens; last exit stops activity polling', async () => {
@@ -85,4 +88,23 @@ test('a failed setup exits non-zero instead of silently reporting success', asyn
   const runtime = await launch(['electron', '.', '--setup'], { loginError: new Error('Windows startup registration could not be verified') });
   assert.equal(runtime.setup, true);
   assert.equal(runtime.exitCode, 1);
+});
+
+test('the tray\'s "Show usage details" entry previews, focuses the window, and tells the renderer to focus a badge', async () => {
+  const runtime = await launch();
+  runtime.win.emit('ready-to-show');
+  assert.equal(runtime.visible, false);
+  runtime.inspect();
+  assert.equal(runtime.visible, true);
+  assert.equal(runtime.focused, true);
+  assert.deepEqual(runtime.messages.at(-1), ['pill:inspect']);
+});
+
+test('the tray\'s "Show usage details" entry is a no-op once the window is destroyed', async () => {
+  const runtime = await launch();
+  runtime.win.emit('ready-to-show');
+  runtime.destroy();
+  assert.doesNotThrow(() => runtime.inspect());
+  assert.equal(runtime.visible, false);
+  assert.equal(runtime.focused, false);
 });

@@ -61,6 +61,29 @@ test('claude: empty/unknown transcript -> unknown', () => {
   assert.equal(parseClaudeActivity(''), 'unknown');
 });
 
+test('claude: freshly submitted prompt serialized as a plain string (no array wrapper) -> working', () => {
+  // Claude Code 2.1.280 writes a typed prompt's message.content as a bare
+  // string, not [{type:'text', ...}], when there are no attachments.
+  const state = parseClaudeActivity(fixture('claude-transcript-string-prompt.jsonl'));
+  assert.equal(state, 'working');
+});
+
+test('claude: isMeta string-content record is not treated as a fresh prompt -> idle', () => {
+  const lines = fixture('claude-transcript-string-prompt.jsonl').trim().split('\n');
+  const last = JSON.parse(lines[lines.length - 1]);
+  last.isMeta = true;
+  lines[lines.length - 1] = JSON.stringify(last);
+  assert.equal(parseClaudeActivity(lines.join('\n')), 'idle');
+});
+
+test('claude: empty string content is not treated as a fresh prompt -> idle', () => {
+  const lines = fixture('claude-transcript-string-prompt.jsonl').trim().split('\n');
+  const last = JSON.parse(lines[lines.length - 1]);
+  last.message.content = '';
+  lines[lines.length - 1] = JSON.stringify(last);
+  assert.equal(parseClaudeActivity(lines.join('\n')), 'idle');
+});
+
 test('codex: root/user thread is identified and its rate_limits are read', () => {
   const { isUserThread, rateLimits, activity } = parseCodexRollout(
     fixture('codex-rollout-root.jsonl')
