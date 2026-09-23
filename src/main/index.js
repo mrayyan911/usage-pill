@@ -85,6 +85,7 @@ function main() {
     // the OS actually gives the window input focus -- showPreview() alone
     // uses showInactive() so hover-preview never steals focus, which would be
     // wrong here.
+    if (win.isDestroyed()) return;
     win.show();
     win.focus();
     win.webContents.send('pill:inspect');

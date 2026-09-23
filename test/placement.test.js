@@ -94,14 +94,46 @@ test('shared pill freezes expansion through a drag and resumes hover after the d
   assert.deepEqual(win.messages, [['pill:hover', true], ['pill:hover', false]]);
 });
 
+// Common off-screen drag origin used to probe which clamp rect (collapsed
+// vs expanded) is currently governing the window, across the isExpanded
+// tests below.
+function dragOffscreen(win) {
+  win.setBounds({ x: -200, y: -100, width: 280, height: 102 });
+  return win.getBounds().x;
+}
+
 test('keyboard inspection uses expanded drag bounds even before a native hover', t => {
   const { win } = attach(t);
   win.webContents.emit('ipc-message', {}, 'pill:expanded', true);
-  win.setBounds({ x: -200, y: -100, width: 280, height: 102 });
-  assert.equal(win.getBounds().x, -16);
+  assert.equal(dragOffscreen(win), -16);
   win.webContents.emit('ipc-message', {}, 'pill:expanded', false);
-  win.setBounds({ x: -200, y: -100, width: 280, height: 102 });
-  assert.equal(win.getBounds().x, -88);
+  assert.equal(dragOffscreen(win), -88);
+});
+
+test('a non-boolean pill:expanded payload is ignored, keeping the last valid value', t => {
+  const { win } = attach(t);
+  win.webContents.emit('ipc-message', {}, 'pill:expanded', true);
+  win.webContents.emit('ipc-message', {}, 'pill:expanded', 'yes');
+  assert.equal(dragOffscreen(win), -16);
+});
+
+test('a keyboard-inspecting card corrects the hover poll\'s optimistic collapse guess', t => {
+  const { win, screen } = attach(t);
+  screen.cursor = { x: 500, y: 20 };
+  t.mock.timers.tick(150);
+  assert.deepEqual(win.messages, [['pill:hover', true]]);
+  // Keyboard inspection is independently keeping the renderer's card
+  // expanded -- mirrors the real onInspect()+updateExpansion() reply.
+  win.webContents.emit('ipc-message', {}, 'pill:expanded', true);
+  screen.cursor = { x: -100, y: -100 };
+  t.mock.timers.tick(150);
+  assert.deepEqual(win.messages, [['pill:hover', true], ['pill:hover', false]]);
+  // The hover poll's optimistic guess just (wrongly) set isExpanded false --
+  // dragging now clamps against the collapsed rect until corrected.
+  assert.equal(dragOffscreen(win), -88);
+  // The renderer's own updateExpansion() reply corrects it within the tick.
+  win.webContents.emit('ipc-message', {}, 'pill:expanded', true);
+  assert.equal(dragOffscreen(win), -16);
 });
 
 test('shared pill preserves expansion at an edge without moving its window', t => {
@@ -139,6 +171,16 @@ test('shared pill gates renderer menus by its footprint and freezes hover while 
   menu.dismiss();
   t.mock.timers.tick(150);
   assert.deepEqual(win.messages, [['pill:hover', true], ['pill:hover', false]]);
+});
+
+test('shared pill gates the context menu by the expanded footprint when keyboard-inspecting without any hover', t => {
+  const { win, menu } = attach(t);
+  // Inside the larger expanded rect but outside the small collapsed one.
+  win.webContents.emit('context-menu', {}, { x: 50, y: 20 });
+  assert.equal(menu.openCount, 0);
+  win.webContents.emit('ipc-message', {}, 'pill:expanded', true);
+  win.webContents.emit('context-menu', {}, { x: 50, y: 20 });
+  assert.equal(menu.openCount, 1);
 });
 
 test('shared pill ignores hover while hidden', t => {
@@ -199,5 +241,6 @@ test('closing the shared pill cancels saves and removes only its own subscriptio
   assert.equal(win.listenerCount('move'), 0);
   assert.equal(win.listenerCount('system-context-menu'), 0);
   assert.equal(win.webContents.listenerCount('context-menu'), 0);
+  assert.equal(win.webContents.listenerCount('ipc-message'), 0);
   assert.equal(menu.openCount, 0);
 });
