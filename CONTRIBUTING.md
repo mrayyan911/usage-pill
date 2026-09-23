@@ -4,7 +4,7 @@
 
 ```
 npm install
-npm test                     # 84 unit tests, no Electron runtime needed
+npm test                     # 86 unit tests, no Electron runtime needed
 USAGE_PILL_MOCK=1 npm start  # scripted demo of every state/threshold, no real usage needed
 npm start                    # real data (reads live Claude/Codex usage)
 ```

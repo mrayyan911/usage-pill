@@ -7,7 +7,7 @@ const UTILITY_COMMANDS = {
   codex: new Set('agents login logout mcp mcp-server plugin app-server remote-control app completion update doctor sandbox debug apply a queue archive delete migrate-rollouts unarchive cloud exec-server features help'.split(' ')),
 };
 const VALUE_OPTIONS = {
-  claude: new Set('--agent --agents --append-system-prompt --autocompact --debug-file --effort --environment --fallback-model --input-format --json-schema --max-budget-usd --model -n --name --output-format --permission-mode --session-id --setting-sources --settings --system-prompt --system-prompt-file --append-system-prompt-file --system-prompt-snapshot'.split(' ')),
+  claude: new Set('--agent --agents --append-system-prompt --autocompact --debug-file --effort --environment --fallback-model --input-format --json-schema --max-budget-usd --model -n --name --output-format -p --print --permission-mode --session-id --setting-sources --settings --system-prompt --system-prompt-file --append-system-prompt-file --system-prompt-snapshot'.split(' ')),
   codex: new Set('-c --config --enable --disable --remote --remote-auth-token-env -i --image -m --model --local-provider -p --profile -s --sandbox -C --cd --add-dir -a --ask-for-approval -o --output-last-message --output-schema'.split(' ')),
 };
 // Claude Desktop ships its own claude.exe (MSIX under WindowsApps, or a

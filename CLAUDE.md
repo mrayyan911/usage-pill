@@ -60,7 +60,7 @@ UsageStore (Claude/Codex)┘
 
 ### Automatic startup (native Windows only)
 
-`--monitor` mode runs the pill hidden until a native Windows `claude`/`codex` session opens, per the approved behavior in [docs/plans/automatic-startup.md](docs/plans/automatic-startup.md) and terminology in [CONTEXT.md](CONTEXT.md).
+`--monitor` mode runs the pill hidden until a native Windows `claude`/`codex` session opens, per the terminology in [CONTEXT.md](CONTEXT.md).
 
 - **`stores/sessions.js` (`SessionStore`)** polls `providers/windowsProcesses.js` every second (a PowerShell/CIM `Win32_Process` query scoped to the interactive desktop session, so services and other users' sessions never appear) and classifies each row through `parsers/processSessions.js`. A failed poll retains the previous snapshot rather than flashing the pill closed; concurrent polls share one in-flight read via `AbortController`.
 - **`parsers/processSessions.js`** decides whether a `claude.exe`/`codex.exe`/`node.exe` row is a real agent session: it parses the raw Windows command line (backslash/quote rules differ from POSIX shells — see `splitCommandLine`), excludes utility commands/options (`--help`, `mcp-server`, etc.) so ordinary CLI use doesn't pop the pill, and collapses a launcher/child pair (e.g. `node.exe` running `codex.js` spawning `codex.exe`) into one session. **Claude Desktop ships its own `claude.exe`** (MSIX under `WindowsApps`, or a per-user `AnthropicClaude` install) that is otherwise indistinguishable from the CLI by name or args — `DESKTOP_APP_PATH_MARKERS` rejects it by install path. Command lines can contain prompts or secrets, so they're never logged or surfaced in errors.

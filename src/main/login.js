@@ -1,7 +1,7 @@
 'use strict';
 
-function configureLogin(app, enabled, executable = process.execPath) {
-  if (process.platform !== 'win32') throw new Error('Automatic startup requires native Windows');
+function configureLogin(app, enabled, executable = process.execPath, platform = process.platform) {
+  if (platform !== 'win32') throw new Error('Automatic startup requires native Windows');
   const args = app.isPackaged ? ['--monitor'] : [`"${app.getAppPath()}"`, '--monitor'];
   const settings = { name: 'UsagePill', path: executable, args, openAtLogin: enabled, enabled };
   app.setLoginItemSettings(settings);
