@@ -19,7 +19,10 @@ colors, or content styles changed. The existing easing and duration remain.
 
 ## Verification
 
-Run `node --test test/renderer-animation.test.js` or `npm test`.
+Run `npm run test:renderer` for the optional animation regression and `npm test`
+for the unit suite. The renderer command requires the installed Electron binary
+and a display environment capable of running Electron. On headless Linux,
+Electron's system libraries and a display server such as Xvfb are required.
 The regression uses Electron, the production preload, real hover IPC,
 and the production HTML, CSS, and renderer. It samples CSS transitions at
 10ms intervals and also reverses running transitions on successive frames.
@@ -31,7 +34,7 @@ and the production HTML, CSS, and renderer. It samples CSS transitions at
 - No final height snap; top edge and horizontal center remain fixed.
 - Expanded heights remain 50px, 64px, 78px, and 74px respectively.
 - All cases finish at the original 36px compact height.
-- Full suite: 85 tests passed.
+- Combined validation: 86 unit tests and one renderer regression passed.
 
 The original real-time repro also passed after the fix, shrinking from
 64px through 59.5px, 55.4px, and subsequent smaller heights to 36px.
