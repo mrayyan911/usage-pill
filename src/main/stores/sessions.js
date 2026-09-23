@@ -1,10 +1,10 @@
 'use strict';
 
-const { readWindowsProcesses } = require('../providers/windowsProcesses');
+const { readProcesses: readPlatformProcesses } = require('../providers/processes');
 const { readSessions } = require('../parsers/processSessions');
 
 class SessionStore {
-  constructor({ readProcesses = readWindowsProcesses, intervalMs = 1000 } = {}) {
+  constructor({ readProcesses = readPlatformProcesses, intervalMs = 1000 } = {}) {
     this._readProcesses = readProcesses;
     this._intervalMs = intervalMs;
     this._sessions = [];
