@@ -11,7 +11,7 @@ function positionFilePath() {
 /**
  * Persists where the user last dragged the pill so it can reopen there.
  * Reads/writes are synchronous: this only runs at launch and at drag-end
- * (already debounced by window.js's existing drag-idle timer), not on a
+ * (already debounced by placement.js's drag-idle timer), not on a
  * hot path.
  */
 class PositionStore {
