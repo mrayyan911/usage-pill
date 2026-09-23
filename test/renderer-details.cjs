@@ -18,6 +18,7 @@ app.whenReady().then(async () => {
     win.webContents.send('pill:hover', true);
     await settle();
     assert.equal(await evaluate("document.querySelector('.percent').textContent"), '60%');
+    assert.equal(await evaluate("document.querySelector('.freshness').textContent"), 'stale');
     assert.match(await evaluate("document.querySelector('.badge').getAttribute('aria-label')"), /approval/i);
     assert.equal(await evaluate("document.querySelector('.collapsed.blocked') !== null"), true);
     await evaluate("document.querySelectorAll('.badge')[1].click()");
@@ -48,7 +49,10 @@ app.whenReady().then(async () => {
     await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}))");
     await settle();
     assert.equal(await evaluate("document.getElementById('pill').classList.contains('expanded')"), false);
-    console.log('PASS stale values, approval, details, selection removal, keyboard inspection, Escape');
+    win.webContents.send('pill:state', { agents: [{ agent: 'codex', state: 'idle', status: 'error', percent: 40 }] });
+    await settle();
+    assert.equal(await evaluate("document.querySelector('.freshness').textContent"), 'unavailable');
+    console.log('PASS stale values, approval, details, selection removal, keyboard inspection, Escape, error freshness label');
     app.exit(0);
   } catch (error) { console.error(error); app.exit(1); }
 });

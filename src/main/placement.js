@@ -22,8 +22,10 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
     };
 
     // Shared mutable state across the blocks below:
-    // - wasHovering: which rect (collapsed/expanded) is currently showing, so
-    //   clamping and hit-testing both target the pill the user can actually see.
+    // - wasHovering / isExpanded: which rect (collapsed/expanded) is currently
+    //   showing, so clamping and hit-testing both target the pill the user can
+    //   actually see. isExpanded also tracks keyboard-driven expansion (via the
+    //   'pill:expanded' IPC below), which can outlast pointer hover.
     // - clampGuard: set around every *programmatic* setBounds() call so it
     //   never re-enters the 'move' handler below as if it were a user drag.
     // - isDragging / dragIdleTimer: see the 'move' handler.
@@ -189,6 +191,13 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
       const isHovering = cursor.x >= b.x && cursor.x <= b.x + b.width && cursor.y >= b.y && cursor.y <= b.y + b.height;
       if (isHovering !== wasHovering) {
         wasHovering = isHovering;
+        // Optimistic guess so the *next* poll tick's hit-test already uses the
+        // right rect instead of waiting a full round trip. If keyboard
+        // inspection is what's actually keeping the card expanded, this can
+        // momentarily disagree with the renderer -- but 'pill:hover' below
+        // drives the renderer's own updateExpansion(), which always replies
+        // with the true value over the 'pill:expanded' IPC handled above, so
+        // it corrects itself within the same tick.
         isExpanded = isHovering;
         if (!win.isDestroyed()) win.webContents.send('pill:hover', isHovering);
       }

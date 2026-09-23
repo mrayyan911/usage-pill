@@ -80,6 +80,11 @@ function main() {
   } });
   tray = createTray(controller, () => app.quit(), () => {
     controller.showPreview();
+    // Unlike every other path here, this one is a keyboard entry point: the
+    // renderer's 'pill:inspect' handler focuses a badge, which only works if
+    // the OS actually gives the window input focus -- showPreview() alone
+    // uses showInactive() so hover-preview never steals focus, which would be
+    // wrong here.
     win.show();
     win.focus();
     win.webContents.send('pill:inspect');

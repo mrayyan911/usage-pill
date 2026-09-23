@@ -212,7 +212,8 @@
       const word = statusWord(row);
       r.percentEl.textContent = word || fmtPercent(row.percent);
       r.percentEl.classList.toggle('percent-status', !!word);
-      r.freshnessEl.textContent = row.percent != null && ['stale', 'error'].includes(row.status) ? 'stale' : '';
+      r.freshnessEl.textContent =
+        row.percent == null ? '' : row.status === 'stale' ? 'stale' : row.status === 'error' ? 'unavailable' : '';
       r.el.hidden = selectedAgent != null && selectedAgent !== keyOf(row);
       r.badgeEl.classList.toggle('blocked', row.state === 'blocked');
       r.badgeEl.setAttribute('aria-label', `${description(row)}. Show details`);

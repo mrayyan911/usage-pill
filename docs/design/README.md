@@ -29,8 +29,9 @@ within the existing single-row 78px bound; `← Both` returns to the two-agent
 overview. The tray's `Show usage details` action focuses these controls for
 keyboard use. Escape or leaving the window closes inspection.
 
-Blocked agents carry a static `!` marker in both sizes. Stale readings retain
-their numeric value with a separate `stale` label. Resting Claude marks use
+Blocked agents carry a static `!` marker in both sizes. Stale or errored
+readings retain their numeric value with a separate `stale`/`unavailable`
+label, so a live fetch error never reads as merely old data. Resting Claude marks use
 slightly higher opacity to balance the silver Codex mark.
 
 Icons use identical 20px slots but different SVG sizes (Claude 17px, Codex 14px)
