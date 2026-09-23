@@ -148,6 +148,12 @@ test('excludes Claude Desktop, whose claude.exe is indistinguishable from the CL
   assert.equal(classifyProcess({ name: desktopMain, argv: [perUserExe] }), null);
 });
 
+test('classifyProcess treats extension-less POSIX process names the same as Windows .exe names', () => {
+  assert.equal(classifyProcess({ name: 'codex', argv: ['/usr/local/bin/codex', 'exec', 'hi'] }), 'codex');
+  assert.equal(classifyProcess({ name: 'claude', argv: ['claude', '--version'] }), null);
+  assert.equal(classifyProcess({ name: 'node', argv: ['node', '/opt/app/node_modules/@openai/codex/bin/codex.js', 'exec'] }), 'codex');
+});
+
 test('unrelated node commands cannot impersonate a CLI through prompt text', () => {
   assert.equal(classifyProcess({ name: 'node.exe', argv: ['node', 'server.js', 'C:\\node_modules\\@openai\\codex\\bin\\codex.js'] }), null);
   assert.equal(classifyProcess({ name: 'node.exe', argv: ['node', '-e', 'codex'] }), null);
