@@ -5,8 +5,12 @@
   const collapsedRowEl = document.getElementById('collapsedRow');
   const agentRowsEl = document.getElementById('agentRows');
   const detailEl = document.getElementById('detail');
+  const backEl = document.getElementById('backToAgents');
 
   let lastState = null;
+  let selectedAgent = null;
+  let hovering = false;
+  let inspecting = false;
   // Persistent per-agent-identity DOM refs, reused across ticks so an
   // in-place percent/state update never restarts a running CSS animation
   // (working pulse, shimmer sweep) -- a node is only rebuilt when the
@@ -66,6 +70,7 @@
 
   /** Short stand-in for the percent cell itself, when there's no number to show yet. */
   function statusWord(row) {
+    if (row.percent != null && (row.status === 'stale' || row.status === 'error')) return null;
     switch (row.status) {
       case 'unauthenticated':
         return 'sign in';
@@ -76,6 +81,27 @@
       default:
         return null;
     }
+  }
+
+  function agentName(row) {
+    return row.agent === 'claude' ? 'Claude' : row.agent === 'codex' ? 'Codex' : 'No active agent';
+  }
+
+  function activityLabel(row) {
+    return row.state === 'blocked' ? 'Needs approval' : row.state === 'working' ? 'Working' : 'Idle';
+  }
+
+  function description(row) {
+    return [agentName(row), activityLabel(row), row.percent == null ? statusWord(row) : `${fmtPercent(row.percent)} used`,
+      statusNote(row), fmtResetsIn(row.resetsAt),
+      row.weeklyPercent == null ? null : `weekly ${Math.round(row.weeklyPercent)}%`, row.planType].filter(Boolean).join(' · ');
+  }
+
+  function updateExpansion() {
+    const expanded = !!lastState && (hovering || inspecting);
+    pillEl.classList.toggle('expanded', expanded);
+    document.querySelector('.expanded-card').inert = !expanded;
+    window.usagePill.setExpanded(expanded);
   }
 
   function makeIconEl(agentKey, sizeClass) {
@@ -127,6 +153,9 @@
       const working = rowStates[i].state === 'working';
       c.el.classList.toggle('working', working);
       c.el.classList.toggle('idle', !working);
+      c.el.classList.toggle('blocked', rowStates[i].state === 'blocked');
+      c.el.setAttribute('role', 'img');
+      c.el.setAttribute('aria-label', `${agentName(rowStates[i])}, ${activityLabel(rowStates[i])}`);
     });
   }
 
@@ -135,9 +164,14 @@
     el.className = 'agent-row';
     el.style.setProperty('--row-color', iconsFor(agentKey).color);
 
-    const badgeEl = document.createElement('div');
+    const badgeEl = document.createElement('button');
+    badgeEl.type = 'button';
     badgeEl.className = 'badge';
     badgeEl.appendChild(makeIconEl(agentKey, 'badge-icon'));
+    badgeEl.addEventListener('click', () => {
+      selectedAgent = selectedAgent === agentKey ? null : agentKey;
+      render(lastState);
+    });
 
     const trackEl = document.createElement('div');
     trackEl.className = 'bar-track';
@@ -150,12 +184,17 @@
 
     const percentEl = document.createElement('div');
     percentEl.className = 'percent';
+    const usageEl = document.createElement('div');
+    usageEl.className = 'usage-value';
+    const freshnessEl = document.createElement('span');
+    freshnessEl.className = 'freshness';
+    usageEl.append(percentEl, freshnessEl);
 
     el.appendChild(badgeEl);
     el.appendChild(trackEl);
-    el.appendChild(percentEl);
+    el.appendChild(usageEl);
 
-    return { agentKey, el, badgeEl, fillEl, shimmerEl, percentEl };
+    return { agentKey, el, badgeEl, fillEl, shimmerEl, percentEl, freshnessEl };
   }
 
   function reconcileAgentRows(rowStates) {
@@ -173,6 +212,14 @@
       const word = statusWord(row);
       r.percentEl.textContent = word || fmtPercent(row.percent);
       r.percentEl.classList.toggle('percent-status', !!word);
+      r.freshnessEl.textContent = row.percent != null && ['stale', 'error'].includes(row.status) ? 'stale' : '';
+      r.el.hidden = selectedAgent != null && selectedAgent !== keyOf(row);
+      r.badgeEl.classList.toggle('blocked', row.state === 'blocked');
+      r.badgeEl.setAttribute('aria-label', `${description(row)}. Show details`);
+      r.badgeEl.setAttribute('aria-pressed', String(selectedAgent === keyOf(row)));
+      r.badgeEl.title = description(row);
+      r.el.setAttribute('role', 'group');
+      r.el.setAttribute('aria-label', description(row));
 
       const clamped = row.percent == null ? 0 : Math.max(0, Math.min(100, row.percent)) / 100;
       r.fillEl.style.transform = `scaleX(${clamped})`;
@@ -190,22 +237,30 @@
   }
 
   function renderDetail(rowStates) {
-    if (rowStates.length !== 1) {
+    const selected = rowStates.find(row => keyOf(row) === selectedAgent);
+    backEl.hidden = !(selected && rowStates.length > 1);
+    if (rowStates.length !== 1 && !selected) {
       detailEl.textContent = '';
       return;
     }
-    const [row] = rowStates;
+    const row = selected || rowStates[0];
     const parts = [];
+    if (selected || row.state === 'blocked') parts.push(`${agentName(row)} · ${activityLabel(row)}`);
     const note = statusNote(row);
-    if (note) parts.push(note);
+    if (note && !selected) parts.push(note);
     const resetsIn = fmtResetsIn(row.resetsAt);
     if (resetsIn) parts.push(resetsIn);
     if (row.weeklyPercent != null) parts.push(`weekly ${Math.round(row.weeklyPercent)}%`);
     if (row.planType) parts.push(row.planType);
+    if (note && selected) parts.push(note);
     detailEl.textContent = parts.join(' · ');
+    detailEl.title = detailEl.textContent;
   }
 
   function render(state) {
+    const focusedControl = document.activeElement;
+    const hadFocus = pillEl.contains(focusedControl);
+    const focusedRow = rows.find(row => row.badgeEl === document.activeElement);
     const rowStates =
       state.agents && state.agents.length
         ? state.agents
@@ -213,6 +268,7 @@
 
     pillEl.classList.toggle('agents-2', rowStates.length === 2);
     pillEl.classList.toggle('agents-1', rowStates.length === 1);
+    if (!rowStates.some(row => keyOf(row) === selectedAgent)) selectedAgent = null;
 
     reconcileCollapsed(rowStates);
     const { anyWorking, anyDanger } = reconcileAgentRows(rowStates);
@@ -223,12 +279,51 @@
     renderDetail(rowStates);
 
     lastState = state;
+    updateExpansion();
+    if (inspecting && hadFocus && (!focusedControl.isConnected || !focusedControl.getClientRects().length || document.activeElement !== focusedControl)) {
+      const replacement = rows.find(row => !row.el.hidden && row.agentKey === focusedRow?.agentKey)
+        || rows.find(row => !row.el.hidden);
+      replacement?.badgeEl.focus();
+    }
   }
 
+  backEl.addEventListener('click', () => {
+    const previous = selectedAgent;
+    selectedAgent = null;
+    render(lastState);
+    rows.find(row => row.agentKey === previous)?.badgeEl.focus();
+  });
+  pillEl.addEventListener('focusin', () => { inspecting = true; updateExpansion(); });
+  pillEl.addEventListener('focusout', () => {
+    queueMicrotask(() => {
+      if (!pillEl.contains(document.activeElement)) { inspecting = false; updateExpansion(); }
+    });
+  });
+  function closeDetails() {
+    inspecting = false;
+    hovering = false;
+    selectedAgent = null;
+    if (pillEl.contains(document.activeElement)) document.activeElement.blur();
+    if (lastState) render(lastState);
+  }
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { event.preventDefault(); closeDetails(); }
+  });
+  window.addEventListener('blur', closeDetails);
+  window.usagePill.onInspect(() => {
+    inspecting = true;
+    updateExpansion();
+    rows.find(row => !row.el.hidden)?.badgeEl.focus();
+  });
   window.usagePill.onState(render);
   window.usagePill.onHover((isHovering) => {
     // Grows the pill in place (CSS grid-row morph) rather than showing a
     // separate floating tooltip -- the "dynamic island" expand.
-    pillEl.classList.toggle('expanded', isHovering && !!lastState);
+    hovering = isHovering;
+    if (!hovering && !inspecting) {
+      selectedAgent = null;
+      if (lastState) render(lastState);
+    }
+    updateExpansion();
   });
 })();

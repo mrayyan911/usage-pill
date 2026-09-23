@@ -2,7 +2,7 @@
 
 const { Tray, Menu, nativeImage } = require('electron');
 
-function createTray(controller, quit) {
+function createTray(controller, quit, inspect) {
   const pixels = Buffer.alloc(16 * 16 * 4);
   for (let y = 4; y < 12; y++) {
     for (let x = 1; x < 15; x++) {
@@ -19,6 +19,7 @@ function createTray(controller, quit) {
       { label: 'Pause automatic display', enabled: !paused, click: () => controller.pause() },
       { label: 'Resume', enabled: paused || preview, click: () => controller.resume() },
       { label: 'Show preview', click: () => controller.showPreview() },
+      { label: 'Show usage details', click: inspect },
       { type: 'separator' },
       { label: 'Quit', click: quit },
     ]));

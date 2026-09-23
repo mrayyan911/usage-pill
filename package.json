@@ -11,7 +11,7 @@
     "setup": "node scripts/manage-startup.js setup",
     "setup:remove": "node scripts/manage-startup.js remove",
     "test": "node --test test/parsers.test.js test/codex-provider.test.js test/activityLog.test.js test/config.test.js test/reduce.test.js test/fsUtil.test.js test/activity.test.js test/position.test.js test/placement.test.js test/sessions.test.js test/visibility.test.js test/login.test.js test/startup.test.js test/processesDispatch.test.js",
-    "test:renderer": "node --test test/renderer-animation.test.js test/codex-session.test.js"
+    "test:renderer": "node --test test/renderer-animation.test.js test/codex-session.test.js test/renderer-details.test.js"
   },
   "devDependencies": {
     "electron": "^44.3.0"

@@ -28,10 +28,17 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
     //   never re-enters the 'move' handler below as if it were a user drag.
     // - isDragging / dragIdleTimer: see the 'move' handler.
     let wasHovering = false;
+    let isExpanded = false;
     let clampGuard = false;
     let isDragging = false;
     let dragIdleTimer = null;
     let menuOpen = false;
+
+    // Keyboard inspection can outlast pointer hover; native drag bounds must
+    // follow the renderer's actual expansion, including Escape dismissal.
+    listen(win.webContents, 'ipc-message', (_event, channel, expanded) => {
+      if (channel === 'pill:expanded' && typeof expanded === 'boolean') isExpanded = expanded;
+    });
 
     const restoreDefaultPosition = () => {
       // A pending drag save must not recreate the position after a reset.
@@ -66,7 +73,7 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
     });
     listen(win.webContents, 'context-menu', (_event, params) => {
       const bounds = win.getBounds();
-      const rect = ConfigStore.pillHitRect(bounds, { expanded: wasHovering });
+      const rect = ConfigStore.pillHitRect(bounds, { expanded: isExpanded });
       const x = bounds.x + params.x;
       const y = bounds.y + params.y;
       if (x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height) {
@@ -106,7 +113,7 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
       if (win.isDestroyed()) return;
       const b = win.getBounds();
       const display = nearestDisplayFor(b);
-      const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: wasHovering });
+      const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: isExpanded });
       clampGuard = true;
       win.setBounds(clamped);
       clampGuard = false;
@@ -151,7 +158,7 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
 
       const b = win.getBounds();
       const display = nearestDisplayFor(b);
-      const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: wasHovering });
+      const clamped = ConfigStore.clampWindowToVisiblePill(b, display.workArea, { expanded: isExpanded });
       if (clamped.x !== b.x || clamped.y !== b.y) {
         clampGuard = true;
         win.setBounds(clamped);
@@ -178,10 +185,11 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
       if (win.isDestroyed() || !win.isVisible()) return;
       if (isDragging || menuOpen) return;
       const cursor = screen.getCursorScreenPoint();
-      const b = ConfigStore.pillHitRect(win.getBounds(), { expanded: wasHovering });
+      const b = ConfigStore.pillHitRect(win.getBounds(), { expanded: isExpanded });
       const isHovering = cursor.x >= b.x && cursor.x <= b.x + b.width && cursor.y >= b.y && cursor.y <= b.y + b.height;
       if (isHovering !== wasHovering) {
         wasHovering = isHovering;
+        isExpanded = isHovering;
         if (!win.isDestroyed()) win.webContents.send('pill:hover', isHovering);
       }
     }, HOVER_POLL_MS);

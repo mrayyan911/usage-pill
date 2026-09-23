@@ -78,7 +78,12 @@ function main() {
     tray?.update();
     if (process.env.USAGE_PILL_DEBUG === '1') console.log('VISIBILITY', JSON.stringify(state));
   } });
-  tray = createTray(controller, () => app.quit());
+  tray = createTray(controller, () => app.quit(), () => {
+    controller.showPreview();
+    win.show();
+    win.focus();
+    win.webContents.send('pill:inspect');
+  });
   win.once('ready-to-show', () => {
     ready = true;
     controller.setReady();

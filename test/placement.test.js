@@ -94,6 +94,16 @@ test('shared pill freezes expansion through a drag and resumes hover after the d
   assert.deepEqual(win.messages, [['pill:hover', true], ['pill:hover', false]]);
 });
 
+test('keyboard inspection uses expanded drag bounds even before a native hover', t => {
+  const { win } = attach(t);
+  win.webContents.emit('ipc-message', {}, 'pill:expanded', true);
+  win.setBounds({ x: -200, y: -100, width: 280, height: 102 });
+  assert.equal(win.getBounds().x, -16);
+  win.webContents.emit('ipc-message', {}, 'pill:expanded', false);
+  win.setBounds({ x: -200, y: -100, width: 280, height: 102 });
+  assert.equal(win.getBounds().x, -88);
+});
+
 test('shared pill preserves expansion at an edge without moving its window', t => {
   const { win, screen } = attach(t);
   win.setBounds({ x: -88, y: -6, width: 280, height: 102 });
