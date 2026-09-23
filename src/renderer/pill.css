@@ -21,6 +21,7 @@ body {
 }
 
 .pill {
+  --expanded-width: 248px;
   position: relative;
   box-sizing: border-box;
   width: 84px;
@@ -32,13 +33,13 @@ body {
 
 /* Two collapsed icons need a little more room than one. Height is never
    set explicitly anywhere in this file -- it stays intrinsic, driven by
-   .pill-inner's grid content, exactly like the width-only expand below. */
+   the collapsible rows' content. */
 .pill.agents-2 {
   width: 104px;
 }
 
 .pill.expanded {
-  width: 248px;
+  width: var(--expanded-width);
   border-radius: 25px;
 }
 
@@ -51,19 +52,29 @@ body {
    item itself would prevent a 0fr row from fully disappearing. */
 .pill-inner {
   box-sizing: border-box;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 1fr 0fr;
   border-radius: inherit;
   overflow: hidden;
   background: #050505;
   border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.025);
-  transition: grid-template-rows 0.45s var(--spring);
 }
 
-.pill.expanded .pill-inner {
-  grid-template-rows: 0fr 1fr;
+/* Separate grids interpolate each content height independently. Shared fr
+   tracks in an auto-height grid retain the taller content until the end. */
+.collapsed-row, .expanded-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  transition: grid-template-rows 0.45s var(--spring), opacity 0.18s ease;
+}
+
+.collapsed-row { grid-template-rows: 1fr; }
+.expanded-card { grid-template-rows: 0fr; }
+.pill.expanded .collapsed-row { grid-template-rows: 0fr; }
+.pill.expanded .expanded-card { grid-template-rows: 1fr; }
+
+.row-clip {
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Collapsed strip: just the agent icon(s), centered -- the small resting
@@ -73,7 +84,6 @@ body {
   min-height: 0;
   overflow: hidden;
   opacity: 1;
-  transition: opacity 0.18s ease;
 }
 
 .collapsed-icons {
@@ -161,6 +171,10 @@ body {
 }
 
 .expanded-content {
+  /* Keep detail wrapping stable while the outer shell narrows. Subtract
+     the shell's borders from the existing expanded design width. */
+  box-sizing: border-box;
+  width: calc(var(--expanded-width) - 2px);
   display: flex;
   flex-direction: column;
   gap: 4px;

@@ -5,9 +5,16 @@
 ```
 npm install
 npm test                     # 86 unit tests, no Electron runtime needed
+npm run test:renderer        # optional Electron animation regression
 USAGE_PILL_MOCK=1 npm start  # scripted demo of every state/threshold, no real usage needed
 npm start                    # real data (reads live Claude/Codex usage)
 ```
+
+The renderer regression requires the Electron binary installed by `npm install`
+and an environment capable of running Electron with a display. Run it from a
+desktop session; it is separate from `npm test` so the unit suite stays usable
+without a GUI. Headless Linux needs Electron's system libraries and a display
+server such as Xvfb.
 
 `USAGE_PILL_DEBUG=1` (combine with either `npm start` variant) logs every
 state change to the terminal — the fastest way to see what the reducer is
