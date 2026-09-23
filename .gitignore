@@ -15,3 +15,4 @@ desktop.ini
 # Scratch output from agent design-review tooling (screenshots, reports,
 # logs) -- not source, regenerated per run.
 design-review/
+docs/
