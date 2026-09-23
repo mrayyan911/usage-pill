@@ -148,6 +148,10 @@ test('excludes Claude Desktop, whose claude.exe is indistinguishable from the CL
   assert.equal(classifyProcess({ name: desktopMain, argv: [perUserExe] }), null);
 });
 
+test('excludes a macOS Claude Desktop install under /Applications', () => {
+  assert.equal(classifyProcess({ name: 'claude', argv: ['/Applications/Claude.app/Contents/MacOS/Claude'] }), null);
+});
+
 test('classifyProcess treats extension-less POSIX process names the same as Windows .exe names', () => {
   assert.equal(classifyProcess({ name: 'codex', argv: ['/usr/local/bin/codex', 'exec', 'hi'] }), 'codex');
   assert.equal(classifyProcess({ name: 'claude', argv: ['claude', '--version'] }), null);
