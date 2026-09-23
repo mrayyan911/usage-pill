@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/@mrayyan911/usage-pill"><img alt="npm" src="https://img.shields.io/npm/v/%40mrayyan911%2Fusage-pill?style=flat-square"></a>
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square">
   <img alt="Electron" src="https://img.shields.io/badge/Electron-44-9feaf9?style=flat-square">
@@ -42,6 +43,8 @@ usage, and plan, or click an agent icon to inspect it directly.
 
 ## Screenshots
 
+Captured from a live-launched instance (`USAGE_PILL_MOCK=1`), not mockups.
+
 | Collapsed | Expanded |
 | --- | --- |
 | ![Collapsed, two agents](docs/design/screenshots/compact-collapsed-two.png) | ![Expanded, two agents](docs/design/screenshots/compact-expanded-two.png) |
@@ -56,11 +59,6 @@ usage-pill setup        # register a hidden monitor to launch at login
 usage-pill monitor      # run that monitor manually, without registering it
 usage-pill setup:remove # unregister it
 ```
-
-> [!NOTE]
-> This package hasn't been published to the npm registry yet, so
-> `npm install -g` won't resolve until then — see [Status](#status). Run
-> from source in the meantime.
 
 ### Run from source
 
@@ -149,11 +147,15 @@ shared by `bin/usage-pill.js` and `scripts/manage-startup.js`.
 ## Status
 
 > [!NOTE]
-> - **Not published to npm yet** — `npm install -g @mrayyan911/usage-pill`
->   requires a one-time `npm publish --access public` first; run from
->   source until then.
-> - **macOS/Linux unverified on real hardware** — implemented and
->   unit-tested, not yet run on an actual Mac or Linux machine.
-> - **Live UI polish is a manual check** — hover-expand, fullscreen-app
->   stacking, and multi-monitor behavior are best confirmed by running
->   `npm start` yourself; the unit suite covers logic, not pixels.
+> - **macOS/Linux unverified on real hardware** — session detection and
+>   login-item registration are implemented and unit-tested against current
+>   Electron/XDG documentation, but not yet run on an actual Mac or Linux
+>   machine.
+> - **Multi-monitor and fullscreen-app stacking** are best confirmed by
+>   running the pill yourself on your own display setup; the unit suite
+>   covers logic, not every possible desktop configuration.
+
+Manually verified on Windows (2026-09-23): launched from a live instance
+(collapsed/expanded, one- and two-agent rows, real percentages and badges),
+confirmed against the visual source of truth — see the screenshots above,
+captured from that same run.
