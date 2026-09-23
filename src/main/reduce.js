@@ -5,10 +5,9 @@
  * getters into the single shape the renderer consumes. Kept separate from
  * the timers/IO in index.js so it's trivially unit-testable.
  *
- * Reports one agent row normally (whichever is active, matching the prior
- * single-agent behavior), but reports BOTH when Claude and Codex are busy
- * at the same time -- that's the only condition the Dynamic-Island-style
- * two-row expanded view exists for. `primary` stays the busier/most
+ * Open sessions determine which rows exist, independently of turn activity.
+ * Without session data, manual preview preserves the prior activity-based
+ * selection. `primary` stays the busier/most
  * recently touched agent (ActivityStore's own mtime tie-break), used by the
  * renderer for the collapsed pill's ambient glow color and row ordering.
  *
@@ -19,8 +18,11 @@
  *   weeklyPercent:number|null,planType:string|null,state:string,status:string}>,
  *   primary:'claude'|'codex'|null}}
  */
-function reduce({ activitySnapshot, claudeUsage, codexUsage }) {
-  const { active, claude: claudeState, codex: codexState } = activitySnapshot;
+function reduce({ activitySnapshot, claudeUsage, codexUsage, sessionAgents }) {
+  const { claude: claudeState, codex: codexState } = activitySnapshot;
+  const active = sessionAgents
+    ? sessionAgents.includes(activitySnapshot.active) ? activitySnapshot.active : sessionAgents[0] || null
+    : activitySnapshot.active;
 
   if (!active) {
     return {
@@ -53,6 +55,11 @@ function reduce({ activitySnapshot, claudeUsage, codexUsage }) {
   const codexEntry = entry('codex', codexUsage, codexState);
   const isBusy = (state) => state === 'working' || state === 'blocked';
 
+  if (sessionAgents) {
+    const order = [active, ...sessionAgents.filter(agent => agent !== active)];
+    return { agents: order.map(agent => agent === 'claude' ? claudeEntry : codexEntry), primary: active };
+  }
+
   const agents =
     isBusy(claudeState) && isBusy(codexState)
       ? active === 'claude'
@@ -71,9 +78,11 @@ function reduce({ activitySnapshot, claudeUsage, codexUsage }) {
  * the reduced state actually differs from what was last sent.
  */
 class Reducer {
-  constructor({ activityStore, usageStore, onChange, tickMs = 400 }) {
+  constructor({ activityStore, usageStore, sessionStore, preview = () => false, onChange, tickMs = 400 }) {
     this._activityStore = activityStore;
     this._usageStore = usageStore;
+    this._sessionStore = sessionStore;
+    this._preview = preview;
     this._onChange = onChange;
     this._tickMs = tickMs;
     this._timer = null;
@@ -103,10 +112,12 @@ class Reducer {
     this._usageStore.maybeRefreshClaude(claudeEdge);
     this._usageStore.refreshCodex(); // cheap local reads; no separate schedule needed
 
+    const sessions = this._sessionStore?.getSnapshot().agents;
     const state = reduce({
       activitySnapshot,
       claudeUsage: this._usageStore.getClaudeUsage(),
       codexUsage: this._usageStore.getCodexUsage(),
+      sessionAgents: this._preview() && !sessions?.length ? undefined : sessions,
     });
 
     const json = JSON.stringify(state);
