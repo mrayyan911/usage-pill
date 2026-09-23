@@ -6,11 +6,13 @@
   const agentRowsEl = document.getElementById('agentRows');
   const detailEl = document.getElementById('detail');
   const backEl = document.getElementById('backToAgents');
+  const expandedCardEl = document.querySelector('.expanded-card');
 
   let lastState = null;
-  let selectedAgent = null;
-  let hovering = false;
-  let inspecting = false;
+  // These three always travel together to decide whether the card is
+  // expanded and which agent it's showing, so they're one interaction object
+  // rather than three separately-updated globals.
+  const interaction = { selectedAgent: null, hovering: false, inspecting: false };
   // Persistent per-agent-identity DOM refs, reused across ticks so an
   // in-place percent/state update never restarts a running CSS animation
   // (working pulse, shimmer sweep) -- a node is only rebuilt when the
@@ -91,16 +93,20 @@
     return row.state === 'blocked' ? 'Needs approval' : row.state === 'working' ? 'Working' : 'Idle';
   }
 
+  /** resetsIn/weekly/plan, in display order -- shared between the compact badge label and the detail line. */
+  function commonFacts(row) {
+    return [fmtResetsIn(row.resetsAt), row.weeklyPercent == null ? null : `weekly ${Math.round(row.weeklyPercent)}%`, row.planType];
+  }
+
   function description(row) {
     return [agentName(row), activityLabel(row), row.percent == null ? statusWord(row) : `${fmtPercent(row.percent)} used`,
-      statusNote(row), fmtResetsIn(row.resetsAt),
-      row.weeklyPercent == null ? null : `weekly ${Math.round(row.weeklyPercent)}%`, row.planType].filter(Boolean).join(' · ');
+      statusNote(row), ...commonFacts(row)].filter(Boolean).join(' · ');
   }
 
   function updateExpansion() {
-    const expanded = !!lastState && (hovering || inspecting);
+    const expanded = !!lastState && (interaction.hovering || interaction.inspecting);
     pillEl.classList.toggle('expanded', expanded);
-    document.querySelector('.expanded-card').inert = !expanded;
+    expandedCardEl.inert = !expanded;
     window.usagePill.setExpanded(expanded);
   }
 
@@ -169,7 +175,7 @@
     badgeEl.className = 'badge';
     badgeEl.appendChild(makeIconEl(agentKey, 'badge-icon'));
     badgeEl.addEventListener('click', () => {
-      selectedAgent = selectedAgent === agentKey ? null : agentKey;
+      interaction.selectedAgent = interaction.selectedAgent === agentKey ? null : agentKey;
       render(lastState);
     });
 
@@ -214,10 +220,10 @@
       r.percentEl.classList.toggle('percent-status', !!word);
       r.freshnessEl.textContent =
         row.percent == null ? '' : row.status === 'stale' ? 'stale' : row.status === 'error' ? 'unavailable' : '';
-      r.el.hidden = selectedAgent != null && selectedAgent !== keyOf(row);
+      r.el.hidden = interaction.selectedAgent != null && interaction.selectedAgent !== keyOf(row);
       r.badgeEl.classList.toggle('blocked', row.state === 'blocked');
       r.badgeEl.setAttribute('aria-label', `${description(row)}. Show details`);
-      r.badgeEl.setAttribute('aria-pressed', String(selectedAgent === keyOf(row)));
+      r.badgeEl.setAttribute('aria-pressed', String(interaction.selectedAgent === keyOf(row)));
       r.badgeEl.title = description(row);
       r.el.setAttribute('role', 'group');
       r.el.setAttribute('aria-label', description(row));
@@ -238,30 +244,42 @@
   }
 
   function renderDetail(rowStates) {
-    const selected = rowStates.find(row => keyOf(row) === selectedAgent);
+    const selected = rowStates.find(row => keyOf(row) === interaction.selectedAgent);
     backEl.hidden = !(selected && rowStates.length > 1);
     if (rowStates.length !== 1 && !selected) {
       detailEl.textContent = '';
       return;
     }
     const row = selected || rowStates[0];
-    const parts = [];
-    if (selected || row.state === 'blocked') parts.push(`${agentName(row)} · ${activityLabel(row)}`);
     const note = statusNote(row);
-    if (note && !selected) parts.push(note);
-    const resetsIn = fmtResetsIn(row.resetsAt);
-    if (resetsIn) parts.push(resetsIn);
-    if (row.weeklyPercent != null) parts.push(`weekly ${Math.round(row.weeklyPercent)}%`);
-    if (row.planType) parts.push(row.planType);
-    if (note && selected) parts.push(note);
-    detailEl.textContent = parts.join(' · ');
+    const parts = [
+      selected || row.state === 'blocked' ? `${agentName(row)} · ${activityLabel(row)}` : null,
+      !selected ? note : null,
+      ...commonFacts(row),
+      selected ? note : null,
+    ];
+    detailEl.textContent = parts.filter(Boolean).join(' · ');
     detailEl.title = detailEl.textContent;
+  }
+
+  /**
+   * A repaint can hide or move the row whose badge holds keyboard focus (the
+   * agent stopped being shown, or reconcileAgentRows() hid it via selection).
+   * Restores focus to that agent's badge if it's still shown, else the first
+   * visible one, so a keyboard-driven inspection never silently loses focus.
+   */
+  function preserveFocusAcrossRender(focusedControl, hadFocus, focusedAgentKey) {
+    if (!interaction.inspecting || !hadFocus) return;
+    const stillFocused = focusedControl.isConnected && focusedControl.getClientRects().length && document.activeElement === focusedControl;
+    if (stillFocused) return;
+    const replacement = rows.find(row => !row.el.hidden && row.agentKey === focusedAgentKey) || rows.find(row => !row.el.hidden);
+    replacement?.badgeEl.focus();
   }
 
   function render(state) {
     const focusedControl = document.activeElement;
     const hadFocus = pillEl.contains(focusedControl);
-    const focusedRow = rows.find(row => row.badgeEl === document.activeElement);
+    const focusedAgentKey = rows.find(row => row.badgeEl === focusedControl)?.agentKey;
     const rowStates =
       state.agents && state.agents.length
         ? state.agents
@@ -269,7 +287,7 @@
 
     pillEl.classList.toggle('agents-2', rowStates.length === 2);
     pillEl.classList.toggle('agents-1', rowStates.length === 1);
-    if (!rowStates.some(row => keyOf(row) === selectedAgent)) selectedAgent = null;
+    if (!rowStates.some(row => keyOf(row) === interaction.selectedAgent)) interaction.selectedAgent = null;
 
     reconcileCollapsed(rowStates);
     const { anyWorking, anyDanger } = reconcileAgentRows(rowStates);
@@ -281,29 +299,25 @@
 
     lastState = state;
     updateExpansion();
-    if (inspecting && hadFocus && (!focusedControl.isConnected || !focusedControl.getClientRects().length || document.activeElement !== focusedControl)) {
-      const replacement = rows.find(row => !row.el.hidden && row.agentKey === focusedRow?.agentKey)
-        || rows.find(row => !row.el.hidden);
-      replacement?.badgeEl.focus();
-    }
+    preserveFocusAcrossRender(focusedControl, hadFocus, focusedAgentKey);
   }
 
   backEl.addEventListener('click', () => {
-    const previous = selectedAgent;
-    selectedAgent = null;
+    const previous = interaction.selectedAgent;
+    interaction.selectedAgent = null;
     render(lastState);
     rows.find(row => row.agentKey === previous)?.badgeEl.focus();
   });
-  pillEl.addEventListener('focusin', () => { inspecting = true; updateExpansion(); });
+  pillEl.addEventListener('focusin', () => { interaction.inspecting = true; updateExpansion(); });
   pillEl.addEventListener('focusout', () => {
     queueMicrotask(() => {
-      if (!pillEl.contains(document.activeElement)) { inspecting = false; updateExpansion(); }
+      if (!pillEl.contains(document.activeElement)) { interaction.inspecting = false; updateExpansion(); }
     });
   });
   function closeDetails() {
-    inspecting = false;
-    hovering = false;
-    selectedAgent = null;
+    interaction.inspecting = false;
+    interaction.hovering = false;
+    interaction.selectedAgent = null;
     if (pillEl.contains(document.activeElement)) document.activeElement.blur();
     if (lastState) render(lastState);
   }
@@ -312,7 +326,7 @@
   });
   window.addEventListener('blur', closeDetails);
   window.usagePill.onInspect(() => {
-    inspecting = true;
+    interaction.inspecting = true;
     updateExpansion();
     rows.find(row => !row.el.hidden)?.badgeEl.focus();
   });
@@ -320,9 +334,9 @@
   window.usagePill.onHover((isHovering) => {
     // Grows the pill in place (CSS grid-row morph) rather than showing a
     // separate floating tooltip -- the "dynamic island" expand.
-    hovering = isHovering;
-    if (!hovering && !inspecting) {
-      selectedAgent = null;
+    interaction.hovering = isHovering;
+    if (!interaction.hovering && !interaction.inspecting) {
+      interaction.selectedAgent = null;
       if (lastState) render(lastState);
     }
     updateExpansion();
