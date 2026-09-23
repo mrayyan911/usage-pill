@@ -3,10 +3,6 @@
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
-if (process.platform !== 'win32') {
-  console.error('Automatic startup currently supports native Windows only.');
-  process.exit(1);
-}
 const action = process.argv[2];
 if (!['setup', 'remove'].includes(action)) {
   console.error('Use npm run setup or npm run setup:remove.');
@@ -24,6 +20,13 @@ child.on('exit', code => {
   if (code !== 0) { process.exitCode = code || 1; return; }
   if (action === 'remove') {
     console.log('Login startup disabled. Use Quit in the tray to stop the current monitor.');
+    return;
+  }
+  // Session detection (the part that shows/hides the pill) is still native-Windows
+  // only, so `--monitor` would launch and immediately quit itself on other
+  // platforms; launching it here would misreport success.
+  if (process.platform !== 'win32') {
+    console.log("Login item registered. Automatic session detection isn't available on this platform yet -- run `npm run monitor` manually once it is.");
     return;
   }
   const monitor = spawn(electron, [root, '--monitor'], { env, cwd: root, detached: true, windowsHide: true, stdio: 'ignore' });
