@@ -1,119 +1,159 @@
-# Usage Pill
+<p align="center">
+  <img src="docs/design/screenshots/compact-collapsed-two.png" alt="Usage Pill, collapsed, showing Claude and Codex both active" width="140">
+</p>
 
-A tiny always-on-top overlay showing real-time Claude Code / Codex usage: an
-animated bar, a percentage, and an agent badge per active agent — one row
-normally, two stacked when Claude and Codex are both mid-turn at once.
+<h1 align="center">Usage Pill</h1>
 
-Launches top-center of your primary display, Dynamic-Island style — hover
-to expand it in place and see reset time / weekly usage / plan. Drag it
-anywhere on any connected display, collapsed or expanded; it hard-stops at
-the edge of whichever display it's currently over, and reopens at that same
-spot next launch (falling back to top-center if that display's gone).
+<p align="center">
+  A tiny always-on-top overlay for real-time Claude Code / Codex usage.
+</p>
 
-Click an agent icon to inspect its activity, reset time, weekly usage, and
-plan. When two agents are shown, **← Both** returns to the two-row view.
-A small **!** marks an agent waiting for approval. Stale readings retain
-their last percentage with a separate freshness label.
+<p align="center">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square">
+  <img alt="Electron" src="https://img.shields.io/badge/Electron-44-9feaf9?style=flat-square">
+  <img alt="No build step" src="https://img.shields.io/badge/build%20step-none-success?style=flat-square">
+</p>
 
-For keyboard access, choose **Show usage details** from the tray, then use
-Tab and Enter to inspect an agent. Press Escape or focus another window to
-close the details. Drag using the bar area; the expanded icons are buttons.
+Usage Pill sits at the top of your screen, Dynamic-Island style, and shows
+an animated bar, a percentage, and an agent badge for whichever of Claude
+Code or Codex is mid-turn — one row normally, two stacked when both are
+busy at once. Hover to expand it in place and see reset time, weekly
+usage, and plan, or click an agent icon to inspect it directly.
 
-## Run it
+## Features
 
+- **Live usage for two agents.** Claude Code and Codex tracked
+  independently, each with its own animated bar, percentage, and badge.
+- **Dynamic-Island interaction.** Launches top-center, collapsed to an
+  icon strip; hover expands it in place with reset time, weekly usage,
+  and plan. Click an agent icon (or use the tray's **Show usage details**
+  for keyboard access) to inspect it; **← Both** returns to the shared view.
+- **Draggable, edge-aware placement.** Drag to any spot on any connected
+  display; it hard-stops at the screen edge and reopens in the same spot
+  next launch.
+- **Meaningful state, not just a number.** A small **!** marks an agent
+  waiting on a permission prompt; stale readings keep their last known
+  percentage with a separate freshness label instead of silently going dark.
+- **Cross-platform automatic startup.** An optional hidden background
+  monitor (Windows, macOS, Linux) that appears only while a `claude` or
+  `codex` session is open and disappears when the last one closes.
+- **No build step, no framework.** The renderer is plain HTML/CSS/JS.
+
+## Screenshots
+
+| Collapsed | Expanded |
+| --- | --- |
+| ![Collapsed, two agents](docs/design/screenshots/compact-collapsed-two.png) | ![Expanded, two agents](docs/design/screenshots/compact-expanded-two.png) |
+| ![Collapsed, one agent](docs/design/screenshots/compact-collapsed-one.png) | ![Expanded, one agent](docs/design/screenshots/compact-expanded-one.png) |
+
+## Install
+
+```sh
+npm install -g @mrayyan911/usage-pill
+usage-pill              # real data, always visible (manual preview)
+usage-pill setup        # register a hidden monitor to launch at login
+usage-pill monitor      # run that monitor manually, without registering it
+usage-pill setup:remove # unregister it
 ```
+
+> [!NOTE]
+> This package hasn't been published to the npm registry yet, so
+> `npm install -g` won't resolve until then — see [Status](#status). Run
+> from source in the meantime.
+
+### Run from source
+
+```sh
 npm install
 npm start                    # real data, always visible (manual preview)
 USAGE_PILL_MOCK=1 npm start  # scripted demo of every state, no waiting on real usage
 USAGE_PILL_DEBUG=1 npm start # also logs every state change to the terminal
 ```
 
-## Automatic startup (native Windows)
+> [!TIP]
+> `USAGE_PILL_MOCK=1 npm start` steps through every state and threshold on a
+> timer — the fastest way to see what the pill looks like without waiting on
+> real Claude/Codex usage.
+
+## Automatic startup
 
 Instead of running `npm start` yourself every time, Usage Pill can run as a
 hidden background monitor that appears only while a `claude` or `codex`
 session is open — one shared pill across every open terminal — and
 disappears when the last one closes.
 
-```
+```sh
 npm run setup         # register a hidden monitor to launch at login
 npm run monitor        # run that monitor manually, without registering it
 npm run setup:remove   # unregister it
 ```
 
-A tray icon offers **Pause automatic display**, **Resume**, **Show preview**,
-**Show usage details**, and **Quit**. Scripted runs (`codex exec`, `claude -p`) count as sessions;
-`--help`/`--version`/utility subcommands and Claude Desktop do not.
+This registers a login item on Windows, macOS (a `~/Library/LaunchAgents`
+LaunchAgent), or Linux (an XDG `~/.config/autostart` entry), then launches
+the monitor — the part that watches for an open `claude`/`codex` session and
+shows/hides the pill. A tray icon offers **Pause automatic display**,
+**Resume**, **Show preview**, **Show usage details**, and **Quit**. Scripted
+runs (`codex exec`, `claude -p`) count as sessions; `--help`/`--version`/
+utility subcommands and Claude Desktop do not.
 
-`npm run setup`/`npm run setup:remove` register/unregister a login item on
-Windows, macOS (a `~/Library/LaunchAgents` LaunchAgent), and Linux (an XDG
-`~/.config/autostart` entry). The macOS/Linux paths are verified against
-current Electron/XDG documentation and covered by unit tests, but haven't
-yet been exercised on real macOS/Linux hardware.
+> [!NOTE]
+> The macOS/Linux paths are implemented and unit-tested against current
+> Electron/XDG documentation but haven't yet been exercised on real
+> macOS/Linux hardware.
 
-The background monitor itself — the part that watches for an open
-`claude`/`codex` session and shows/hides the pill — is still native-Windows
-only for now; macOS/Linux session detection is follow-up work, so
-`npm run setup` on those platforms registers the login item but doesn't
-launch a monitor yet. `npm run setup` currently registers the source
-checkout directly (there's no packaged installer yet, see "Not done yet"
-below).
+## How it works
 
-## Test
+The whole app is one data pipeline:
 
 ```
-npm test
+ActivityStore.poll()  ──┐
+                         ├──> Reducer._tick() ──> reduce() ──> onChange ──> IPC 'pill:state' ──> pill.js render()
+UsageStore (Claude/Codex)┘
 ```
 
-143 unit tests cover the parsers (against scrubbed captured payload fixtures),
-the activity-log state machine, launch-position/drag-clamp/hover hit-test
-bounds math, saved-position load/save round-tripping, the activity store's
-sticky dual-agent selection and busy-agent handoff preference, the reducer
+Activity and usage are tracked independently per agent, then merged into one
+render-able state roughly every 400ms — one row when a single agent is
+active, two when Claude and Codex are both mid-turn at once.
+
+- **Claude's activity** comes primarily from a Claude Code hook
+  (`hooks/activity-hook.js`) that distinguishes "blocked on a permission
+  prompt" from "tool running" — something a transcript alone can't. Without
+  a hook installed, or for any turn recorded before one is, the app falls
+  back to tailing the session transcript directly, so it works out of the
+  box either way. Claude's usage percentage comes from the same OAuth
+  session Claude Code itself uses (`~/.claude/.credentials.json`), refreshed
+  on a schedule plus right after each turn completes.
+- **Codex** has no equivalent turn-start hook, so both its activity and its
+  usage percentage come from tailing the newest session rollout file under
+  `~/.codex/sessions/`.
+
+See [CLAUDE.md](./CLAUDE.md) for the full internals (staleness handling,
+dual-agent ordering, Windows-specific Electron transparency/drag gotchas,
+and more) and [CONTEXT.md](./CONTEXT.md) for the project's domain
+vocabulary.
+
+## Testing
+
+```sh
+npm test              # 149 unit tests — pure functions, no Electron runtime needed
+npm run test:renderer # 3 tests — real Electron animation/interaction regression
+```
+
+`npm test` covers the parsers (against scrubbed captured payload fixtures),
+the activity-log state machine, drag/hover/placement math, the reducer
 (including the two-agents-busy-at-once case), Windows/macOS/Linux session
-detection/classification, the cross-platform login-item registration
-(Windows/macOS/Linux), and the automatic-visibility/login/tray wiring. No
-Electron runtime needed to run these — they're pure functions.
+detection and login-item registration, and the CLI subcommand→flag mapping
+shared by `bin/usage-pill.js` and `scripts/manage-startup.js`.
 
-## How activity detection works
+## Status
 
-Claude Code's own hooks are the primary signal (see the `hooks` block added
-to `~/.claude/settings.json` and `hooks/activity-hook.js`, which they invoke).
-They distinguish "blocked on a permission prompt" from "tool running", which
-a transcript alone cannot. **These apply from your next Claude Code session
-onward** — a running session doesn't pick up settings.json hook changes
-until it restarts. Until then, and as a permanent fallback if hooks are ever
-disabled, the app tails the session transcript directly.
-
-Codex has no equivalent turn-start hook, so its activity comes entirely from
-tailing the newest rollout file, which already gets scanned for usage.
-
-## What was verified before building
-
-- Both HTTP/local data sources were read live (not just documented) before any
-  code was written: Claude's `/api/oauth/usage`, Codex's rollout `rate_limits`.
-- A background technical review verified real file schemas (Claude transcript
-  record types, Codex rollout event types, the Codex hooks.json/config.toml
-  trust-hash gating) and current Electron docs for the Windows-specific
-  transparency/always-on-top/drag gotchas baked into `src/main/window.js`.
-- This build was smoke-tested end-to-end: mock mode (every state/threshold),
-  and real mode (confirmed live Claude usage — 51%/69% — and correct
-  `working` activity detection during this very session).
-
-## Not done yet
-
-- **Packaging.** `npm start` and `npm run setup` both run from source.
-  Distribution as a global npm package is future work; the login-item wiring
-  in `src/main/login.js` already branches on `app.isPackaged` so it's ready
-  for a packaged executable path once one exists.
-- **Live full end-to-end UI check** (does the pill actually look right on
-  your screen — hover-expand, fullscreen-app stacking, monitor unplug).
-  Everything underneath was verified programmatically; only run `npm start`
-  yourself to confirm the last mile.
-
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
-
-## License
-
-MIT — see [LICENSE](./LICENSE).
+> [!NOTE]
+> - **Not published to npm yet** — `npm install -g @mrayyan911/usage-pill`
+>   requires a one-time `npm publish --access public` first; run from
+>   source until then.
+> - **macOS/Linux unverified on real hardware** — implemented and
+>   unit-tested, not yet run on an actual Mac or Linux machine.
+> - **Live UI polish is a manual check** — hover-expand, fullscreen-app
+>   stacking, and multi-monitor behavior are best confirmed by running
+>   `npm start` yourself; the unit suite covers logic, not pixels.

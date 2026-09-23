@@ -2,31 +2,26 @@
 
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const { resolveSubcommandArgs } = require('./cliArgs');
 
 const action = process.argv[2];
-if (!['setup', 'remove'].includes(action)) {
+if (!['setup', 'setup:remove'].includes(action)) {
   console.error('Use npm run setup or npm run setup:remove.');
   process.exit(1);
 }
+const setupArgs = resolveSubcommandArgs(action);
 
 const electron = require('electron');
 const root = path.resolve(__dirname, '..');
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 delete env.USAGE_PILL_MOCK;
-const child = spawn(electron, [root, action === 'setup' ? '--setup' : '--remove-startup'], { env, windowsHide: true, stdio: 'inherit' });
+const child = spawn(electron, [root, ...setupArgs], { env, windowsHide: true, stdio: 'inherit' });
 child.on('error', () => { console.error('Could not launch Electron. Run npm install first.'); process.exitCode = 1; });
 child.on('exit', code => {
   if (code !== 0) { process.exitCode = code || 1; return; }
-  if (action === 'remove') {
+  if (action === 'setup:remove') {
     console.log('Login startup disabled. Use Quit in the tray to stop the current monitor.');
-    return;
-  }
-  // Session detection (the part that shows/hides the pill) is still native-Windows
-  // only, so `--monitor` would launch and immediately quit itself on other
-  // platforms; launching it here would misreport success.
-  if (process.platform !== 'win32') {
-    console.log("Login item registered. Automatic session detection isn't available on this platform yet -- run `npm run monitor` manually once it is.");
     return;
   }
   const monitor = spawn(electron, [root, '--monitor'], { env, cwd: root, detached: true, windowsHide: true, stdio: 'ignore' });

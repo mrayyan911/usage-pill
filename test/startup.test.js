@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
 const { VisibilityController } = require('../src/main/visibility');
 
-async function launch(argv = ['electron', '.','--monitor'], { loginError } = {}) {
+async function launch(argv = ['electron', '.','--monitor'], { loginError, platform = 'win32' } = {}) {
   const app = new EventEmitter();
   let exitCode;
   Object.assign(app, { commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => Promise.resolve(), quit() { app.emit('before-quit'); }, exit(code) { exitCode = code; } });
@@ -44,7 +44,7 @@ async function launch(argv = ['electron', '.','--monitor'], { loginError } = {})
   };
   vm.runInNewContext(fs.readFileSync(require.resolve('../src/main/index'), 'utf8'), {
     require: name => { if (name.startsWith('node:')) return require(name); if (modules[name]) return modules[name]; throw new Error(`Unexpected import ${name}`); },
-    process: { argv, env: {}, platform: 'win32', exitCode: 0 }, console: { ...console, error() {} },
+    process: { argv, env: {}, platform, exitCode: 0 }, console: { ...console, error() {} },
   });
   await new Promise(resolve => setImmediate(resolve));
   return { app, win, messages, get visible() { return visible; }, get focused() { return focused; }, destroy() { destroyed = true; }, get running() { return driverRunning; }, get stopped() { return stopped; }, get setup() { return setup; }, get controller() { return controller; }, get exitCode() { return exitCode; }, inspect: () => inspect(), sessions: agents => updateSessions({ agents, status: 'ok' }) };
@@ -62,6 +62,15 @@ test('monitor stays hidden until ready and a session opens; last exit stops acti
   assert.equal(runtime.running, false);
   runtime.app.quit();
   assert.equal(runtime.stopped, true);
+});
+
+test('monitor mode works on non-Windows platforms now that session detection is cross-platform', async () => {
+  const runtime = await launch(['electron', '.', '--monitor'], { platform: 'darwin' });
+  runtime.win.emit('ready-to-show');
+  assert.equal(runtime.visible, false);
+  runtime.sessions(['claude']);
+  assert.equal(runtime.visible, true);
+  assert.equal(runtime.running, true);
 });
 
 test('a second manual launch previews the existing pill; tray pause and resume restore automatic behavior', async () => {

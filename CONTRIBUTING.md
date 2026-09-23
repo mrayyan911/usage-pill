@@ -81,6 +81,17 @@ Guidelines:
   README's "How activity detection works"); keep it dependency-free and
   never let it throw or block Claude Code.
 
+## Releasing to npm
+
+`bin/usage-pill.js` is the global-install entry point (`package.json`'s
+`bin.usage-pill`); `scripts/cliArgs.js` maps its subcommands to the same
+flags `src/main/index.js` already parses, shared with
+`scripts/manage-startup.js`. Publishing is a manual, one-time-per-release
+step requiring a maintainer's authenticated npm session — bump `version` in
+`package.json`, then run `npm publish --access public` (the package name is
+scoped, `@mrayyan911/usage-pill`, so `--access public` is required on first
+publish). Nothing in the dev workflow (`npm start`, tests) depends on this.
+
 ## Reporting bugs
 
 Open an issue with what you expected, what happened, and — if it's visual —
