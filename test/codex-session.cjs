@@ -30,7 +30,7 @@ app.whenReady().then(async () => {
       }; read();
     })`);
     console.log(JSON.stringify({ sessions: store.getSnapshot(), rendered }));
-    assert.notEqual(rendered.text.toLowerCase(), 'offline', 'an open Codex session with missing usage must not render OFFLINE');
+    assert.equal(rendered.text.trim().toLowerCase(), 'unavailable', 'an open Codex session with missing usage must render "unavailable", not OFFLINE');
     if (live) {
       const { ActivityStore } = require('../src/main/stores/activity');
       const { readCodexSnapshot } = require('../src/main/providers/codex');

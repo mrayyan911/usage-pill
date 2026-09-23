@@ -13,14 +13,28 @@ const rolloutCache = new Map();
 
 // Tail slices lose session_meta and long-running turns' start events. Keep
 // only the records needed by the parser, reading appended bytes on later polls.
+
+// A same-path rewrite (truncate + overwrite) can keep the OS's birthtime, mtime,
+// and inode identical to the previous file -- verified empirically, not just in
+// theory -- so file metadata can't detect it. The opening session_meta line
+// uniquely identifies a session; compare that instead of trusting fs stats alone.
+function readFirstLine(fd, size) {
+  if (!size) return '';
+  const len = Math.min(size, 8192);
+  const buf = Buffer.alloc(len);
+  fs.readSync(fd, buf, 0, len, 0);
+  const nl = buf.indexOf(10);
+  return buf.toString('utf8', 0, nl === -1 ? len : nl);
+}
+
 function readRollout(filePath) {
   const fd = fs.openSync(filePath, 'r');
   try {
     const stat = fs.fstatSync(fd);
+    const firstLine = readFirstLine(fd, stat.size);
     let cached = rolloutCache.get(filePath);
-    if (!cached || cached.birthtimeMs !== stat.birthtimeMs || stat.size < cached.offset ||
-        (stat.size === cached.offset && stat.mtimeMs !== cached.mtimeMs)) {
-      cached = { birthtimeMs: stat.birthtimeMs, offset: 0, pending: Buffer.alloc(0), meta: null, turn: null, usage: null };
+    if (!cached || cached.firstLine !== firstLine || stat.size < cached.offset) {
+      cached = { firstLine, offset: 0, pending: Buffer.alloc(0), meta: null, turn: null, usage: null };
     }
     const buffer = Buffer.alloc(64 * 1024);
     while (cached.offset < stat.size) {
@@ -49,7 +63,6 @@ function readRollout(filePath) {
       }
       cached.pending = Buffer.from(data.subarray(start));
     }
-    cached.mtimeMs = stat.mtimeMs;
     rolloutCache.set(filePath, cached);
     const parsed = parseCodexRollout([cached.meta, cached.turn, cached.usage].filter(Boolean).map(r => JSON.stringify(r)).join('\n'));
     if (cached.turn?.payload.type === 'task_complete') parsed.activity = 'idle';
