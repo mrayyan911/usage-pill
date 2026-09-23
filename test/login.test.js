@@ -141,6 +141,17 @@ test('Linux: an executable or app path containing a space is quoted in Exec, not
   });
 });
 
+test('Linux: a literal percent sign in the path is doubled, not left as a field code', () => {
+  withTempHome((dir, homedir) => {
+    const configHome = path.join(dir, 'xdg-config');
+    const app = { isPackaged: false, getAppPath: () => '/home/rayyan/100%/usage-pill' };
+    configureLogin(app, true, '/usr/bin/usage-pill', 'linux', { homedir, env: { XDG_CONFIG_HOME: configHome } });
+    const desktopPath = path.join(configHome, 'autostart', 'usage-pill.desktop');
+    const contents = fs.readFileSync(desktopPath, 'utf8');
+    assert.match(contents, /^Exec=\/usr\/bin\/usage-pill "\/home\/rayyan\/100%%\/usage-pill" --monitor$/m);
+  });
+});
+
 test('Linux: registering falls back to ~/.config/autostart when XDG_CONFIG_HOME is unset', () => {
   withTempHome((dir, homedir) => {
     const app = { isPackaged: true };

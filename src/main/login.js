@@ -79,10 +79,13 @@ function linuxAutostartPath(homedir, env) {
 // Desktop Entry spec: Exec is split on unescaped whitespace, so a token
 // containing a space (an app-path argument almost always does on Windows,
 // and sometimes does on Linux/macOS too) must be quoted or it silently
-// becomes two arguments.
+// becomes two arguments. A literal '%' must always be doubled to '%%' --
+// independent of quoting -- or the desktop environment reads it as the
+// start of a field code (%f, %u, %c, ...).
 function quoteExecArgument(value) {
-  if (/^[A-Za-z0-9_.:/=-]+$/.test(value)) return value;
-  return `"${value.replace(/([\\"`$])/g, '\\$1')}"`;
+  const percentEscaped = value.replace(/%/g, '%%');
+  if (/^[A-Za-z0-9_.:/=-]+$/.test(value)) return percentEscaped;
+  return `"${percentEscaped.replace(/([\\"`$])/g, '\\$1')}"`;
 }
 
 function linuxDesktopEntryContents(executable, args) {
