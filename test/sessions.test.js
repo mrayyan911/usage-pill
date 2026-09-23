@@ -4,6 +4,24 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fixture = require('./fixtures/processes.json');
 const { SessionStore } = require('../src/main/stores/sessions');
+const { reduce } = require('../src/main/reduce');
+const { EMPTY_USAGE } = require('../src/main/usageShape');
+
+test('session polling discovers starts, concurrent agents, and exits despite missing usage or stale activity', async () => {
+  const codex = require('./fixtures/codex-windows-processes.json');
+  let rows = [];
+  const store = new SessionStore({ readProcesses: async () => rows });
+  for (const [processes, expected] of [[[], []], [codex, ['codex']],
+    [[fixture[0], ...codex], ['claude', 'codex']], [[fixture[0]], ['claude']], [[], []]]) {
+    rows = processes;
+    await store.poll();
+    assert.deepEqual(store.getSnapshot().agents, expected);
+    const state = reduce({ sessionAgents: store.getSnapshot().agents,
+      activitySnapshot: { active: 'claude', claude: 'working', codex: 'idle' },
+      claudeUsage: { ...EMPTY_USAGE, status: 'error' }, codexUsage: { ...EMPTY_USAGE, status: 'error' } });
+    assert.deepEqual(state.agents.map(r => r.agent), expected.length ? expected : [null]);
+  }
+});
 
 test('snapshot failure retains sessions; a successful empty snapshot closes them', async () => {
   let rows = fixture;
