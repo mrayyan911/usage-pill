@@ -6,6 +6,12 @@
   "bin": {
     "usage-pill": "./bin/usage-pill.js"
   },
+  "files": [
+    "bin",
+    "src",
+    "hooks",
+    "scripts"
+  ],
   "license": "MIT",
   "author": "Muhammad Rayyan",
   "scripts": {
