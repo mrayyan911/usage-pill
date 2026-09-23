@@ -19,7 +19,17 @@ For keyboard access, choose **Show usage details** from the tray, then use
 Tab and Enter to inspect an agent. Press Escape or focus another window to
 close the details. Drag using the bar area; the expanded icons are buttons.
 
-## Run it
+## Install
+
+```
+npm install -g @mrayyan911/usage-pill
+usage-pill              # real data, always visible (manual preview)
+usage-pill setup        # register a hidden monitor to launch at login
+usage-pill monitor      # run that monitor manually, without registering it
+usage-pill setup:remove # unregister it
+```
+
+## Run it from source
 
 ```
 npm install
@@ -28,7 +38,7 @@ USAGE_PILL_MOCK=1 npm start  # scripted demo of every state, no waiting on real 
 USAGE_PILL_DEBUG=1 npm start # also logs every state change to the terminal
 ```
 
-## Automatic startup (native Windows)
+## Automatic startup (Windows, macOS, Linux)
 
 Instead of running `npm start` yourself every time, Usage Pill can run as a
 hidden background monitor that appears only while a `claude` or `codex`
@@ -47,17 +57,11 @@ A tray icon offers **Pause automatic display**, **Resume**, **Show preview**,
 
 `npm run setup`/`npm run setup:remove` register/unregister a login item on
 Windows, macOS (a `~/Library/LaunchAgents` LaunchAgent), and Linux (an XDG
-`~/.config/autostart` entry). The macOS/Linux paths are verified against
+`~/.config/autostart` entry), then launch the background monitor — the part
+that watches for an open `claude`/`codex` session and shows/hides the pill —
+which now runs cross-platform too. The macOS/Linux paths are verified against
 current Electron/XDG documentation and covered by unit tests, but haven't
 yet been exercised on real macOS/Linux hardware.
-
-The background monitor itself — the part that watches for an open
-`claude`/`codex` session and shows/hides the pill — is still native-Windows
-only for now; macOS/Linux session detection is follow-up work, so
-`npm run setup` on those platforms registers the login item but doesn't
-launch a monitor yet. `npm run setup` currently registers the source
-checkout directly (there's no packaged installer yet, see "Not done yet"
-below).
 
 ## Test
 
@@ -65,14 +69,16 @@ below).
 npm test
 ```
 
-143 unit tests cover the parsers (against scrubbed captured payload fixtures),
+149 unit tests cover the parsers (against scrubbed captured payload fixtures),
 the activity-log state machine, launch-position/drag-clamp/hover hit-test
 bounds math, saved-position load/save round-tripping, the activity store's
 sticky dual-agent selection and busy-agent handoff preference, the reducer
 (including the two-agents-busy-at-once case), Windows/macOS/Linux session
 detection/classification, the cross-platform login-item registration
-(Windows/macOS/Linux), and the automatic-visibility/login/tray wiring. No
-Electron runtime needed to run these — they're pure functions.
+(Windows/macOS/Linux), cross-platform automatic monitor mode, the CLI
+subcommand→flag mapping shared by `bin/usage-pill.js` and
+`scripts/manage-startup.js`, and the automatic-visibility/login/tray wiring.
+No Electron runtime needed to run these — they're pure functions.
 
 ## How activity detection works
 
@@ -101,10 +107,10 @@ tailing the newest rollout file, which already gets scanned for usage.
 
 ## Not done yet
 
-- **Packaging.** `npm start` and `npm run setup` both run from source.
-  Distribution as a global npm package is future work; the login-item wiring
-  in `src/main/login.js` already branches on `app.isPackaged` so it's ready
-  for a packaged executable path once one exists.
+- **Publishing.** The `@mrayyan911/usage-pill` package isn't published to the
+  npm registry yet — `npm install -g` won't work until `npm publish
+  --access public` has been run once from a maintainer's authenticated npm
+  session.
 - **Live full end-to-end UI check** (does the pill actually look right on
   your screen — hover-expand, fullscreen-app stacking, monitor unplug).
   Everything underneath was verified programmatically; only run `npm start`

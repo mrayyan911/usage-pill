@@ -43,13 +43,8 @@ if (process.argv.includes('--setup') || process.argv.includes('--remove-startup'
 }
 
 function main() {
-  if (!preview && process.platform !== 'win32') {
-    console.error('Automatic display currently supports native Windows only.');
-    app.quit();
-    return;
-  }
   const win = createPillWindow({ autoShow: false });
-  const sessions = !mock && process.platform === 'win32' ? new SessionStore() : null;
+  const sessions = mock ? null : new SessionStore();
   let lastState;
   let ready = false;
   let running = false;

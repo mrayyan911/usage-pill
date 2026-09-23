@@ -1,19 +1,22 @@
 {
-  "name": "usage-pill",
+  "name": "@mrayyan911/usage-pill",
   "version": "0.1.0",
   "description": "Minimal always-on-top desktop overlay showing real-time Claude Code / Codex usage",
   "main": "src/main/index.js",
+  "bin": {
+    "usage-pill": "./bin/usage-pill.js"
+  },
   "license": "MIT",
   "author": "Muhammad Rayyan",
   "scripts": {
     "start": "electron .",
     "monitor": "electron . --monitor",
     "setup": "node scripts/manage-startup.js setup",
-    "setup:remove": "node scripts/manage-startup.js remove",
-    "test": "node --test test/parsers.test.js test/codex-provider.test.js test/activityLog.test.js test/config.test.js test/reduce.test.js test/fsUtil.test.js test/activity.test.js test/usage.test.js test/position.test.js test/placement.test.js test/sessions.test.js test/visibility.test.js test/login.test.js test/startup.test.js test/processesDispatch.test.js test/tray.test.js",
+    "setup:remove": "node scripts/manage-startup.js setup:remove",
+    "test": "node --test test/parsers.test.js test/codex-provider.test.js test/activityLog.test.js test/config.test.js test/reduce.test.js test/fsUtil.test.js test/activity.test.js test/usage.test.js test/position.test.js test/placement.test.js test/sessions.test.js test/visibility.test.js test/login.test.js test/startup.test.js test/processesDispatch.test.js test/tray.test.js test/cliArgs.test.js",
     "test:renderer": "node --test test/renderer-animation.test.js test/codex-session.test.js test/renderer-details.test.js"
   },
-  "devDependencies": {
+  "dependencies": {
     "electron": "^44.3.0"
   }
 }
