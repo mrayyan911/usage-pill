@@ -76,8 +76,17 @@ function linuxAutostartPath(homedir, env) {
   return path.join(configHome, 'autostart', LINUX_DESKTOP_ENTRY_NAME);
 }
 
+// Desktop Entry spec: Exec is split on unescaped whitespace, so a token
+// containing a space (an app-path argument almost always does on Windows,
+// and sometimes does on Linux/macOS too) must be quoted or it silently
+// becomes two arguments.
+function quoteExecArgument(value) {
+  if (/^[A-Za-z0-9_.:/=-]+$/.test(value)) return value;
+  return `"${value.replace(/([\\"`$])/g, '\\$1')}"`;
+}
+
 function linuxDesktopEntryContents(executable, args) {
-  const exec = [executable, ...args].join(' ');
+  const exec = [executable, ...args].map(quoteExecArgument).join(' ');
   return `[Desktop Entry]
 Type=Application
 Name=Usage Pill

@@ -22,6 +22,13 @@ child.on('exit', code => {
     console.log('Login startup disabled. Use Quit in the tray to stop the current monitor.');
     return;
   }
+  // Session detection (the part that shows/hides the pill) is still native-Windows
+  // only, so `--monitor` would launch and immediately quit itself on other
+  // platforms; launching it here would misreport success.
+  if (process.platform !== 'win32') {
+    console.log("Login item registered. Automatic session detection isn't available on this platform yet -- run `npm run monitor` manually once it is.");
+    return;
+  }
   const monitor = spawn(electron, [root, '--monitor'], { env, cwd: root, detached: true, windowsHide: true, stdio: 'ignore' });
   monitor.on('error', () => { console.error('Startup enabled, but the monitor could not start. Run npm run monitor.'); process.exitCode = 1; });
   monitor.on('spawn', () => console.log('Startup enabled and monitor launched. Use the Usage Pill tray menu to pause or quit.'));

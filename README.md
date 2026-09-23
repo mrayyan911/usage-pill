@@ -38,11 +38,17 @@ and **Quit**. Scripted runs (`codex exec`, `claude -p`) count as sessions;
 
 `npm run setup`/`npm run setup:remove` register/unregister a login item on
 Windows, macOS (a `~/Library/LaunchAgents` LaunchAgent), and Linux (an XDG
-`~/.config/autostart` entry). The background monitor itself — the part that
-watches for an open `claude`/`codex` session and shows/hides the pill — is
-still native-Windows only for now; macOS/Linux session detection is
-follow-up work. `npm run setup` currently registers the source checkout
-directly (there's no packaged installer yet, see "Not done yet" below).
+`~/.config/autostart` entry). The macOS/Linux paths are verified against
+current Electron/XDG documentation and covered by unit tests, but haven't
+yet been exercised on real macOS/Linux hardware.
+
+The background monitor itself — the part that watches for an open
+`claude`/`codex` session and shows/hides the pill — is still native-Windows
+only for now; macOS/Linux session detection is follow-up work, so
+`npm run setup` on those platforms registers the login item but doesn't
+launch a monitor yet. `npm run setup` currently registers the source
+checkout directly (there's no packaged installer yet, see "Not done yet"
+below).
 
 ## Test
 
@@ -50,7 +56,7 @@ directly (there's no packaged installer yet, see "Not done yet" below).
 npm test
 ```
 
-111 unit tests cover the parsers (against scrubbed captured payload fixtures),
+112 unit tests cover the parsers (against scrubbed captured payload fixtures),
 the activity-log state machine, launch-position/drag-clamp/hover hit-test
 bounds math, saved-position load/save round-tripping, the activity store's
 sticky dual-agent selection and busy-agent handoff preference, the reducer
