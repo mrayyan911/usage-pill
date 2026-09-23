@@ -86,7 +86,11 @@ function main() {
   win.webContents.on('did-finish-load', () => {
     if (lastState) win.webContents.send('pill:state', lastState);
   });
+  let sessionStatus;
   sessions?.start(snapshot => {
+    if (snapshot.status === 'error' && sessionStatus !== 'error') console.warn('Session detection failed; retaining the last process snapshot.');
+    sessionStatus = snapshot.status;
+    if (process.env.USAGE_PILL_DEBUG === '1') console.log('SESSIONS', JSON.stringify(snapshot));
     controller.setSessions(snapshot.agents);
   });
   app.on('before-quit', () => {

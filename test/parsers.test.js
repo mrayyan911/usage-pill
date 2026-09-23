@@ -9,6 +9,14 @@ const { parseClaudeActivity, IGNORED_TYPES } = require('../src/main/parsers/clau
 const { parseCodexRollout } = require('../src/main/parsers/codexRollout');
 const { classifyProcess, readSessions } = require('../src/main/parsers/processSessions');
 const processesFixture = require('./fixtures/processes.json');
+const codexWindows = require('./fixtures/codex-windows-processes.json');
+
+test('captured Windows npm Codex tree identifies the CLI independently of its shell and terminal host', () => {
+  for (const rows of [codexWindows, codexWindows.slice(0, 3), [codexWindows[2]]]) {
+    assert.deepEqual(readSessions(rows).map(s => [s.agent, s.pid]), [['codex', 52]]);
+  }
+  assert.deepEqual(readSessions(codexWindows.filter(r => !['node.exe', 'codex.exe'].includes(r.Name))), []);
+});
 
 const fixture = (name) => fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8');
 

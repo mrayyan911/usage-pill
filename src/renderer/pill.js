@@ -70,7 +70,7 @@
       case 'unauthenticated':
         return 'sign in';
       case 'error':
-        return 'offline';
+        return 'unavailable';
       case 'stale':
         return 'stale';
       default:
