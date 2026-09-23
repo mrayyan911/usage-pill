@@ -45,11 +45,11 @@ packaged installer yet, see "Not done yet" below).
 npm test
 ```
 
-86 unit tests cover the parsers (against scrubbed captured payload fixtures),
+118 unit tests cover the parsers (against scrubbed captured payload fixtures),
 the activity-log state machine, launch-position/drag-clamp/hover hit-test
 bounds math, saved-position load/save round-tripping, the activity store's
 sticky dual-agent selection and busy-agent handoff preference, the reducer
-(including the two-agents-busy-at-once case), native Windows session
+(including the two-agents-busy-at-once case), Windows/macOS/Linux session
 detection/classification, and the automatic-visibility/login/tray wiring. No
 Electron runtime needed to run these — they're pure functions.
 
