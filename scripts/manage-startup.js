@@ -3,10 +3,6 @@
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
-if (process.platform !== 'win32') {
-  console.error('Automatic startup currently supports native Windows only.');
-  process.exit(1);
-}
 const action = process.argv[2];
 if (!['setup', 'remove'].includes(action)) {
   console.error('Use npm run setup or npm run setup:remove.');

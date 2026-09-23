@@ -27,17 +27,22 @@ session is open — one shared pill across every open terminal — and
 disappears when the last one closes.
 
 ```
-npm run setup         # register a hidden monitor to launch at Windows login
+npm run setup         # register a hidden monitor to launch at login
 npm run monitor        # run that monitor manually, without registering it
 npm run setup:remove   # unregister it
 ```
 
 A tray icon offers **Pause automatic display**, **Resume**, **Show preview**,
 and **Quit**. Scripted runs (`codex exec`, `claude -p`) count as sessions;
-`--help`/`--version`/utility subcommands and Claude Desktop do not. This is
-native-Windows only for now — WSL, macOS, and Linux are follow-up work — and
-`npm run setup` currently registers the source checkout directly (there's no
-packaged installer yet, see "Not done yet" below).
+`--help`/`--version`/utility subcommands and Claude Desktop do not.
+
+`npm run setup`/`npm run setup:remove` register/unregister a login item on
+Windows, macOS (a `~/Library/LaunchAgents` LaunchAgent), and Linux (an XDG
+`~/.config/autostart` entry). The background monitor itself — the part that
+watches for an open `claude`/`codex` session and shows/hides the pill — is
+still native-Windows only for now; macOS/Linux session detection is
+follow-up work. `npm run setup` currently registers the source checkout
+directly (there's no packaged installer yet, see "Not done yet" below).
 
 ## Test
 
@@ -45,12 +50,13 @@ packaged installer yet, see "Not done yet" below).
 npm test
 ```
 
-86 unit tests cover the parsers (against scrubbed captured payload fixtures),
+111 unit tests cover the parsers (against scrubbed captured payload fixtures),
 the activity-log state machine, launch-position/drag-clamp/hover hit-test
 bounds math, saved-position load/save round-tripping, the activity store's
 sticky dual-agent selection and busy-agent handoff preference, the reducer
 (including the two-agents-busy-at-once case), native Windows session
-detection/classification, and the automatic-visibility/login/tray wiring. No
+detection/classification, the cross-platform login-item registration
+(Windows/macOS/Linux), and the automatic-visibility/login/tray wiring. No
 Electron runtime needed to run these — they're pure functions.
 
 ## How activity detection works
@@ -81,7 +87,7 @@ tailing the newest rollout file, which already gets scanned for usage.
 ## Not done yet
 
 - **Packaging.** `npm start` and `npm run setup` both run from source.
-  Packaging (e.g. `electron-builder`) is future work; the login-item wiring
+  Distribution as a global npm package is future work; the login-item wiring
   in `src/main/login.js` already branches on `app.isPackaged` so it's ready
   for a packaged executable path once one exists.
 - **Live full end-to-end UI check** (does the pill actually look right on
