@@ -27,7 +27,7 @@ const DRAG_IDLE_MS = 200;
  * animation (handled entirely in CSS) is never clipped by the OS window
  * bounds.
  */
-function createPillWindow() {
+function createPillWindow({ autoShow = true } = {}) {
   const primary = screen.getPrimaryDisplay();
   const bounds = ConfigStore.resolveLaunchBounds({
     savedPosition: PositionStore.load(),
@@ -78,7 +78,7 @@ function createPillWindow() {
   });
 
   win.once('ready-to-show', () => {
-    win.showInactive(); // show without activating -- don't steal focus
+    if (autoShow) win.showInactive(); // show without activating -- don't steal focus
     win.setAlwaysOnTop(true, ALWAYS_ON_TOP_LEVEL);
   });
 

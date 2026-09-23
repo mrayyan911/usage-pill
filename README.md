@@ -14,10 +14,30 @@ spot next launch (falling back to top-center if that display's gone).
 
 ```
 npm install
-npm start                    # real data
+npm start                    # real data, always visible (manual preview)
 USAGE_PILL_MOCK=1 npm start  # scripted demo of every state, no waiting on real usage
 USAGE_PILL_DEBUG=1 npm start # also logs every state change to the terminal
 ```
+
+## Automatic startup (native Windows)
+
+Instead of running `npm start` yourself every time, Usage Pill can run as a
+hidden background monitor that appears only while a `claude` or `codex`
+session is open — one shared pill across every open terminal — and
+disappears when the last one closes.
+
+```
+npm run setup         # register a hidden monitor to launch at Windows login
+npm run monitor        # run that monitor manually, without registering it
+npm run setup:remove   # unregister it
+```
+
+A tray icon offers **Pause automatic display**, **Resume**, **Show preview**,
+and **Quit**. Scripted runs (`codex exec`, `claude -p`) count as sessions;
+`--help`/`--version`/utility subcommands and Claude Desktop do not. This is
+native-Windows only for now — WSL, macOS, and Linux are follow-up work — and
+`npm run setup` currently registers the source checkout directly (there's no
+packaged installer yet, see "Not done yet" below).
 
 ## Test
 
@@ -25,12 +45,13 @@ USAGE_PILL_DEBUG=1 npm start # also logs every state change to the terminal
 npm test
 ```
 
-60 unit tests cover the parsers (against scrubbed captured payload fixtures),
+84 unit tests cover the parsers (against scrubbed captured payload fixtures),
 the activity-log state machine, launch-position/drag-clamp/hover hit-test
 bounds math, saved-position load/save round-tripping, the activity store's
-sticky dual-agent selection and busy-agent handoff preference, and the
-reducer (including the two-agents-busy-at-once case). No Electron runtime
-needed to run these — they're pure functions.
+sticky dual-agent selection and busy-agent handoff preference, the reducer
+(including the two-agents-busy-at-once case), native Windows session
+detection/classification, and the automatic-visibility/login/tray wiring. No
+Electron runtime needed to run these — they're pure functions.
 
 ## How activity detection works
 
@@ -59,10 +80,10 @@ tailing the newest rollout file, which already gets scanned for usage.
 
 ## Not done yet
 
-- **Packaging.** `npm start` runs from source. Packaging (e.g. `electron-builder`)
-  and the launch-on-login wiring in `src/main/index.js` (already gated on
-  `app.isPackaged`) are ready for it but untested, since there's nothing to
-  package into yet.
+- **Packaging.** `npm start` and `npm run setup` both run from source.
+  Packaging (e.g. `electron-builder`) is future work; the login-item wiring
+  in `src/main/login.js` already branches on `app.isPackaged` so it's ready
+  for a packaged executable path once one exists.
 - **Live full end-to-end UI check** (does the pill actually look right on
   your screen — hover-expand, fullscreen-app stacking, monitor unplug).
   Everything underneath was verified programmatically; only run `npm start`

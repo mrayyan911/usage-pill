@@ -1,0 +1,12 @@
+[
+  {"Name":"claude.exe","ProcessId":101,"ParentProcessId":50,"CreationDate":"2025-01-01T00:00:00Z","CommandLine":"\"C:\\Tools\\claude.exe\""},
+  {"Name":"node.exe","ProcessId":102,"ParentProcessId":50,"CreationDate":"2025-01-01T00:00:00Z","CommandLine":"\"C:\\Program Files\\nodejs\\node.exe\" \"C:\\Tools\\node_modules\\@openai\\codex\\bin\\codex.js\" exec \"Explain --help\""},
+  {"Name":"codex.exe","ProcessId":103,"ParentProcessId":102,"CreationDate":"2025-01-01T00:00:00Z","CommandLine":"C:\\Tools\\codex.exe exec \"Explain --help\""},
+  {"Name":"node.exe","ProcessId":104,"ParentProcessId":50,"CreationDate":"2025-01-01T00:00:00Z","CommandLine":"node C:\\Tools\\node_modules\\@anthropic-ai\\claude-code\\cli.js -p \"Explain this\""},
+  {"Name":"node.exe","ProcessId":105,"ParentProcessId":50,"CreationDate":"2025-01-01T00:00:00Z","CommandLine":"node server.js --agent codex"},
+  {"Name":"codex.exe","ProcessId":106,"ParentProcessId":50,"CreationDate":"2025-01-01T00:00:00Z","CommandLine":"codex.exe app-server --listen stdio://"},
+  {"Name":"claude.exe","ProcessId":107,"ParentProcessId":50,"CreationDate":"2025-01-01T00:00:00Z","CommandLine":"claude.exe --version"},
+  {"Name":"codex.exe","ProcessId":108,"ParentProcessId":50,"CreationDate":"2025-01-01T00:00:00Z","CommandLine":"codex.exe exec --help"},
+  {"Name":"claude.exe","ProcessId":109,"ParentProcessId":50,"CreationDate":"2025-01-01T00:00:00Z","CommandLine":"\"C:\\Program Files\\WindowsApps\\Claude_1.0.0.0_x64__abc123\\app\\claude.exe\""},
+  {"Name":"claude.exe","ProcessId":110,"ParentProcessId":109,"CreationDate":"2025-01-01T00:00:00Z","CommandLine":"\"C:\\Program Files\\WindowsApps\\Claude_1.0.0.0_x64__abc123\\app\\claude.exe\" --type=renderer"}
+]

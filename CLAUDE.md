@@ -18,7 +18,10 @@ Keep the surface almost black, its boundary barely visible, icons optically bala
 npm install
 npm test                     # runs the files listed in package.json's "test" script
 USAGE_PILL_MOCK=1 npm start  # scripted demo of every state/threshold, no real usage needed
-npm start                    # real data (reads live Claude/Codex usage)
+npm start                    # real data (reads live Claude/Codex usage), always visible
+npm run monitor              # native-Windows automatic mode: hidden until a session opens
+npm run setup                # register the monitor to launch at Windows login
+npm run setup:remove         # unregister it
 ```
 
 `USAGE_PILL_DEBUG=1` (combine with either `npm start` variant) logs every pushed state change to the terminal as JSON — the fastest way to inspect what the reducer is doing without eyeballing the pill.
@@ -54,6 +57,17 @@ UsageStore (Claude/Codex)┘
 - Subagent *activity* still counts, though (a running subagent means Codex is genuinely working). See `test/parsers.test.js`'s "subagent trap" test for why this matters.
 
 **Claude's usage** (separate from its activity) comes from `providers/claude.js`, which reads the OAuth access token fresh from `~/.claude/.credentials.json` on every call and never attempts its own token refresh (that's Claude Code's job — racing it would invalidate the user's session).
+
+### Automatic startup (native Windows only)
+
+`--monitor` mode runs the pill hidden until a native Windows `claude`/`codex` session opens, per the approved behavior in [docs/plans/automatic-startup.md](docs/plans/automatic-startup.md) and terminology in [CONTEXT.md](CONTEXT.md).
+
+- **`stores/sessions.js` (`SessionStore`)** polls `providers/windowsProcesses.js` every second (a PowerShell/CIM `Win32_Process` query scoped to the interactive desktop session, so services and other users' sessions never appear) and classifies each row through `parsers/processSessions.js`. A failed poll retains the previous snapshot rather than flashing the pill closed; concurrent polls share one in-flight read via `AbortController`.
+- **`parsers/processSessions.js`** decides whether a `claude.exe`/`codex.exe`/`node.exe` row is a real agent session: it parses the raw Windows command line (backslash/quote rules differ from POSIX shells — see `splitCommandLine`), excludes utility commands/options (`--help`, `mcp-server`, etc.) so ordinary CLI use doesn't pop the pill, and collapses a launcher/child pair (e.g. `node.exe` running `codex.js` spawning `codex.exe`) into one session. **Claude Desktop ships its own `claude.exe`** (MSIX under `WindowsApps`, or a per-user `AnthropicClaude` install) that is otherwise indistinguishable from the CLI by name or args — `DESKTOP_APP_PATH_MARKERS` rejects it by install path. Command lines can contain prompts or secrets, so they're never logged or surfaced in errors.
+- **`visibility.js`** (`VisibilityController`) is the state machine deciding whether the window should be visible: `ready && !paused && (preview || hasSessions)`. `index.js` wires it to `SessionStore` (`setSessions`), the tray (`pause`/`resume`/`showPreview`), and window show/hide — `driver.start()`/`stop()` (the `Reducer` or `MockDriver`) only run while visible, so there's no background polling cost while hidden.
+- **`login.js`** (`configureLogin`) registers/removes the Windows login item via `app.setLoginItemSettings`. Verifying the write is non-obvious: `app.getLoginItemSettings({path, args}).openAtLogin` resolves identity by the app's AppUserModelID, not the custom `name: 'UsagePill'` passed to `setLoginItemSettings` — it never reflects this registration. Verification instead reads `getLoginItemSettings().launchItems` and matches by `name`.
+- **`index.js`**'s `--setup`/`--remove-startup` branch runs headless (no window/tray) and must report failure through `app.exit(code)`, not `process.exitCode` + `app.quit()` — Electron ignores `process.exitCode` on quit, so `scripts/manage-startup.js` (the `npm run setup`/`setup:remove` entry point, which spawns Electron and reads its real exit code) would otherwise report success on a failed registration.
+- **`tray.js`** offers Pause/Resume/Show preview/Quit, reading `VisibilityController.snapshot()` to render its current label/tooltip.
 
 ### Shared low-level helpers
 

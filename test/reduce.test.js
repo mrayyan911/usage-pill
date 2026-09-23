@@ -4,6 +4,34 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { reduce, Reducer } = require('../src/main/reduce');
 
+test('open idle sessions appear before either agent has transcript history', () => {
+  const usage = { percent: null, resetsAt: null, weeklyPercent: null, planType: null, status: 'error' };
+  const result = reduce({ activitySnapshot: { active: null, claude: 'idle', codex: 'idle' }, claudeUsage: usage, codexUsage: usage, sessionAgents: ['claude', 'codex'] });
+  assert.deepEqual(result.agents.map(a => [a.agent, a.state]), [['claude', 'idle'], ['codex', 'idle']]);
+  assert.equal(result.primary, 'claude');
+});
+
+test('closed agents with stale activity cannot replace an open idle session', () => {
+  const usage = { percent: 10, status: 'ok' };
+  const input = { activitySnapshot: { active: 'claude', claude: 'working', codex: 'idle' }, claudeUsage: usage, codexUsage: usage };
+  const result = reduce({ ...input, sessionAgents: ['codex'] });
+  assert.deepEqual(result.agents.map(a => [a.agent, a.state]), [['codex', 'idle']]);
+  assert.equal(result.primary, 'codex');
+  assert.equal(reduce({ ...input, sessionAgents: [] }).primary, null);
+});
+
+test('Reducer uses open sessions even when both are idle', () => {
+  let last;
+  const reducer = new Reducer({
+    activityStore: { poll: () => ({ active: 'claude', claude: 'idle', codex: 'idle' }) },
+    sessionStore: { getSnapshot: () => ({ agents: ['claude', 'codex'], status: 'ok' }) },
+    usageStore: { maybeRefreshClaude() {}, refreshCodex() {}, getClaudeUsage: () => ({}), getCodexUsage: () => ({}) },
+    onChange: state => { last = state; },
+  });
+  reducer._tick();
+  assert.deepEqual(last.agents.map(a => a.agent), ['claude', 'codex']);
+});
+
 test('reduce: neither agent ever used -> single neutral placeholder row', () => {
   const result = reduce({
     activitySnapshot: { active: null, claude: 'idle', codex: 'idle' },
