@@ -55,34 +55,29 @@
     return `resets in ${m}m`;
   }
 
+  // Single source of truth for what each usage status means, so a new status
+  // (or a change to an existing one) only needs updating here rather than in
+  // statusNote/statusWord/the freshness-tag assignment separately.
+  const STATUS_META = {
+    unauthenticated: { note: 'sign in to Claude Code', word: 'sign in' },
+    stale: { note: 'connection lost — showing last known value', word: 'stale', freshnessLabel: 'stale' },
+    error: { note: 'temporarily unavailable', word: 'unavailable', freshnessLabel: 'unavailable' },
+    'never-used': { note: 'no usage yet' },
+  };
+
   function statusNote(row) {
-    switch (row.status) {
-      case 'unauthenticated':
-        return 'sign in to Claude Code';
-      case 'stale':
-        return 'connection lost — showing last known value';
-      case 'error':
-        return 'temporarily unavailable';
-      case 'never-used':
-        return 'no usage yet';
-      default:
-        return null;
-    }
+    return STATUS_META[row.status]?.note ?? null;
   }
 
   /** Short stand-in for the percent cell itself, when there's no number to show yet. */
   function statusWord(row) {
     if (row.percent != null && (row.status === 'stale' || row.status === 'error')) return null;
-    switch (row.status) {
-      case 'unauthenticated':
-        return 'sign in';
-      case 'error':
-        return 'unavailable';
-      case 'stale':
-        return 'stale';
-      default:
-        return null;
-    }
+    return STATUS_META[row.status]?.word ?? null;
+  }
+
+  /** The small freshness tag shown alongside a retained percent for a stale/errored reading. */
+  function freshnessLabel(row) {
+    return row.percent == null ? '' : STATUS_META[row.status]?.freshnessLabel ?? '';
   }
 
   function agentName(row) {
@@ -218,8 +213,7 @@
       const word = statusWord(row);
       r.percentEl.textContent = word || fmtPercent(row.percent);
       r.percentEl.classList.toggle('percent-status', !!word);
-      r.freshnessEl.textContent =
-        row.percent == null ? '' : row.status === 'stale' ? 'stale' : row.status === 'error' ? 'unavailable' : '';
+      r.freshnessEl.textContent = freshnessLabel(row);
       r.el.hidden = interaction.selectedAgent != null && interaction.selectedAgent !== keyOf(row);
       r.badgeEl.classList.toggle('blocked', row.state === 'blocked');
       r.badgeEl.setAttribute('aria-label', `${description(row)}. Show details`);
@@ -270,7 +264,13 @@
    */
   function preserveFocusAcrossRender(focusedControl, hadFocus, focusedAgentKey) {
     if (!interaction.inspecting || !hadFocus) return;
-    const stillFocused = focusedControl.isConnected && focusedControl.getClientRects().length && document.activeElement === focusedControl;
+    // checkVisibility() reads computed style (display/opacity/visibility),
+    // not layout geometry, so it never forces the synchronous reflow
+    // getClientRects() would right after render()'s own batch of DOM
+    // writes -- and unlike checking row.el.hidden, it's correct for every
+    // focusable control (badge, Back, the scrollable detail text), not
+    // only ones that map to an agent row.
+    const stillFocused = focusedControl.isConnected && focusedControl.checkVisibility() && document.activeElement === focusedControl;
     if (stillFocused) return;
     const replacement = rows.find(row => !row.el.hidden && row.agentKey === focusedAgentKey) || rows.find(row => !row.el.hidden);
     replacement?.badgeEl.focus();

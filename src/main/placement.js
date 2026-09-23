@@ -174,7 +174,7 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
     // is pre-sized for the *expanded* state (so the grow animation is never
     // clipped), which is much larger than the collapsed pill -- hit-testing
     // against the full window bounds would trigger expansion from well outside
-    // the visible pill. `wasHovering` also picks which rect to test: the small
+    // the visible pill. `isExpanded` also picks which rect to test: the small
     // collapsed rect while collapsed (so only touching the pill expands it),
     // the larger expanded rect once expanded (so it doesn't snap shut the
     // moment the cursor drifts past the collapsed footprint). While a drag is

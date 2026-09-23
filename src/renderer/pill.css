@@ -225,7 +225,7 @@ body {
   transition: opacity 0.24s ease 0.08s, transform 0.32s var(--spring) 0.08s;
 }
 
-[hidden] { display: none !important; }
+[hidden] { display: none; }
 
 .pill.expanded .agent-row {
   opacity: 1;

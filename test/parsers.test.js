@@ -68,6 +68,22 @@ test('claude: freshly submitted prompt serialized as a plain string (no array wr
   assert.equal(state, 'working');
 });
 
+test('claude: isMeta string-content record is not treated as a fresh prompt -> idle', () => {
+  const lines = fixture('claude-transcript-string-prompt.jsonl').trim().split('\n');
+  const last = JSON.parse(lines[lines.length - 1]);
+  last.isMeta = true;
+  lines[lines.length - 1] = JSON.stringify(last);
+  assert.equal(parseClaudeActivity(lines.join('\n')), 'idle');
+});
+
+test('claude: empty string content is not treated as a fresh prompt -> idle', () => {
+  const lines = fixture('claude-transcript-string-prompt.jsonl').trim().split('\n');
+  const last = JSON.parse(lines[lines.length - 1]);
+  last.message.content = '';
+  lines[lines.length - 1] = JSON.stringify(last);
+  assert.equal(parseClaudeActivity(lines.join('\n')), 'idle');
+});
+
 test('codex: root/user thread is identified and its rate_limits are read', () => {
   const { isUserThread, rateLimits, activity } = parseCodexRollout(
     fixture('codex-rollout-root.jsonl')
