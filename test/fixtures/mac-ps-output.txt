@@ -1,0 +1,7 @@
+  PID  PPID                  STARTED COMMAND
+  103   102 Wed Jan 15 09:30:00 2025 /usr/local/bin/codex exec hi
+   50    40 Wed Jan  1 00:00:00 2025 /usr/bin/node server.js
+  200   100 Mon Feb 10 12:00:00 2025 /Applications/Utilities/claude --version
+
+   10     1 Mon Feb 10 12:00:00 2025 /sbin/launchd
+  300   100 Mon Feb 10 12:00:00 2025 /usr/local/bin/codex exec Explain --help

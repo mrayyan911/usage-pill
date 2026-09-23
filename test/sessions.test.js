@@ -41,10 +41,10 @@ test('unreadable command line retains only a previously identified process with 
   let rows = [fixture[0]];
   const store = new SessionStore({ readProcesses: async () => rows });
   await store.poll();
-  rows = [{ ...fixture[0], CommandLine: null }];
+  rows = [{ ...fixture[0], argv: null }];
   await store.poll();
   assert.deepEqual(store.getSnapshot().agents, ['claude']);
-  rows = [{ ...rows[0], CreationDate: '2025-01-02T00:00:00Z' }];
+  rows = [{ ...rows[0], createdAt: '2025-01-02T00:00:00Z' }];
   await store.poll();
   assert.deepEqual(store.getSnapshot().agents, []);
 });
