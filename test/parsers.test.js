@@ -15,7 +15,7 @@ test('captured Windows npm Codex tree identifies the CLI independently of its sh
   for (const rows of [codexWindows, codexWindows.slice(0, 3), [codexWindows[2]]]) {
     assert.deepEqual(readSessions(rows).map(s => [s.agent, s.pid]), [['codex', 52]]);
   }
-  assert.deepEqual(readSessions(codexWindows.filter(r => !['node.exe', 'codex.exe'].includes(r.Name))), []);
+  assert.deepEqual(readSessions(codexWindows.filter(r => !['node.exe', 'codex.exe'].includes(r.name))), []);
 });
 
 const fixture = (name) => fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8');
@@ -103,37 +103,53 @@ test('detects native and npm sessions without double-counting a launcher and its
 });
 
 test('excludes utility commands and services, including options before the command', () => {
-  for (const args of ['--version', '-V', '--help', 'exec --help', '-c model="x" app-server', 'mcp-server', 'login', 'completion powershell', 'exec-server', 'help exec']) {
-    assert.equal(classifyProcess({ Name: 'codex.exe', CommandLine: `codex.exe ${args}` }), null, args);
+  for (const argv of [
+    ['codex.exe', '--version'], ['codex.exe', '-V'], ['codex.exe', '--help'],
+    ['codex.exe', 'exec', '--help'], ['codex.exe', '-c', 'model=x', 'app-server'],
+    ['codex.exe', 'mcp-server'], ['codex.exe', 'login'], ['codex.exe', 'completion', 'powershell'],
+    ['codex.exe', 'exec-server'], ['codex.exe', 'help', 'exec'],
+  ]) {
+    assert.equal(classifyProcess({ name: 'codex.exe', argv }), null, argv.join(' '));
   }
-  for (const args of ['--version', '-v', 'doctor', 'auth status', 'mcp serve', '--model sonnet update', '--chrome-native-host']) {
-    assert.equal(classifyProcess({ Name: 'claude.exe', CommandLine: `claude.exe ${args}` }), null, args);
+  for (const argv of [
+    ['claude.exe', '--version'], ['claude.exe', '-v'], ['claude.exe', 'doctor'],
+    ['claude.exe', 'auth', 'status'], ['claude.exe', 'mcp', 'serve'],
+    ['claude.exe', '--model', 'sonnet', 'update'], ['claude.exe', '--chrome-native-host'],
+  ]) {
+    assert.equal(classifyProcess({ name: 'claude.exe', argv }), null, argv.join(' '));
   }
 });
 
 test('a print prompt that is itself a utility-command word is still a session, not a utility command', () => {
-  assert.equal(classifyProcess({ Name: 'claude.exe', CommandLine: 'claude.exe -p help' }), 'claude');
-  assert.equal(classifyProcess({ Name: 'claude.exe', CommandLine: 'claude.exe --print doctor' }), 'claude');
+  assert.equal(classifyProcess({ name: 'claude.exe', argv: ['claude.exe', '-p', 'help'] }), 'claude');
+  assert.equal(classifyProcess({ name: 'claude.exe', argv: ['claude.exe', '--print', 'doctor'] }), 'claude');
 });
 
 test('accepts prompts containing command names or help text without interpreting their contents', () => {
-  for (const args of ['exec "Explain --help"', '"app-server details"', '-- "--help"', 'resume --last', '--model help exec "hello"', '-c "model=\\\"test\\\"" exec "hi"']) {
-    assert.equal(classifyProcess({ Name: 'codex.exe', CommandLine: `codex.exe ${args}` }), 'codex', args);
+  for (const argv of [
+    ['codex.exe', 'exec', 'Explain --help'],
+    ['codex.exe', 'app-server details'],
+    ['codex.exe', '--', '--help'],
+    ['codex.exe', 'resume', '--last'],
+    ['codex.exe', '--model', 'help', 'exec', 'hello'],
+    ['codex.exe', '-c', 'model="test"', 'exec', 'hi'],
+  ]) {
+    assert.equal(classifyProcess({ name: 'codex.exe', argv }), 'codex', argv.join(' '));
   }
-  assert.equal(classifyProcess({ Name: 'claude.exe', CommandLine: 'claude.exe -p "Explain --help"' }), 'claude');
+  assert.equal(classifyProcess({ name: 'claude.exe', argv: ['claude.exe', '-p', 'Explain --help'] }), 'claude');
 });
 
 test('excludes Claude Desktop, whose claude.exe is indistinguishable from the CLI by name alone', () => {
   const desktopMain = 'claude.exe';
   const desktopExe = 'C:\\Program Files\\WindowsApps\\Claude_1.0.0.0_x64__abc123\\app\\claude.exe';
-  assert.equal(classifyProcess({ Name: desktopMain, CommandLine: `"${desktopExe}"` }), null);
-  assert.equal(classifyProcess({ Name: desktopMain, CommandLine: `"${desktopExe}" --type=renderer` }), null);
+  assert.equal(classifyProcess({ name: desktopMain, argv: [desktopExe] }), null);
+  assert.equal(classifyProcess({ name: desktopMain, argv: [desktopExe, '--type=renderer'] }), null);
   const perUserExe = 'C:\\Users\\me\\AppData\\Local\\AnthropicClaude\\app-1.0.0\\claude.exe';
-  assert.equal(classifyProcess({ Name: desktopMain, CommandLine: `"${perUserExe}"` }), null);
+  assert.equal(classifyProcess({ name: desktopMain, argv: [perUserExe] }), null);
 });
 
 test('unrelated node commands cannot impersonate a CLI through prompt text', () => {
-  assert.equal(classifyProcess({ Name: 'node.exe', CommandLine: 'node server.js "C:\\node_modules\\@openai\\codex\\bin\\codex.js"' }), null);
-  assert.equal(classifyProcess({ Name: 'node.exe', CommandLine: 'node -e "codex"' }), null);
-  assert.equal(classifyProcess({ Name: 'codex.exe', CommandLine: null }), undefined);
+  assert.equal(classifyProcess({ name: 'node.exe', argv: ['node', 'server.js', 'C:\\node_modules\\@openai\\codex\\bin\\codex.js'] }), null);
+  assert.equal(classifyProcess({ name: 'node.exe', argv: ['node', '-e', 'codex'] }), null);
+  assert.equal(classifyProcess({ name: 'codex.exe', argv: null }), undefined);
 });
