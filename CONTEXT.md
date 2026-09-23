@@ -16,6 +16,10 @@ _Avoid_: Session
 The single usage overlay shared by all open agent sessions, including sessions in different terminals.
 _Avoid_: Per-session pill
 
+**Shared pill placement**:
+The shared pill's position on a display, including its saved position and its placement while collapsed or expanded.
+_Avoid_: Per-session position
+
 **Automatic visibility**:
 The pill appearing when an agent session opens, staying visible between turns, and disappearing when the last agent session closes.
 _Avoid_: Turn-triggered visibility
