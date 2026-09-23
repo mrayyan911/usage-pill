@@ -61,6 +61,13 @@ test('claude: empty/unknown transcript -> unknown', () => {
   assert.equal(parseClaudeActivity(''), 'unknown');
 });
 
+test('claude: freshly submitted prompt serialized as a plain string (no array wrapper) -> working', () => {
+  // Claude Code 2.1.280 writes a typed prompt's message.content as a bare
+  // string, not [{type:'text', ...}], when there are no attachments.
+  const state = parseClaudeActivity(fixture('claude-transcript-string-prompt.jsonl'));
+  assert.equal(state, 'working');
+});
+
 test('codex: root/user thread is identified and its rate_limits are read', () => {
   const { isUserThread, rateLimits, activity } = parseCodexRollout(
     fixture('codex-rollout-root.jsonl')

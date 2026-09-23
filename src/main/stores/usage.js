@@ -21,8 +21,13 @@ const STALE_AFTER_MS = 3 * 60_000;
 class UsageStore {
   constructor({ now = () => Date.now() } = {}) {
     this._now = now;
-    this._claude = { ...EMPTY_USAGE, status: 'error', lastFetchedAt: 0, lastGoodAt: 0 };
-    this._codex = { ...EMPTY_USAGE, status: 'error', lastFetchedAt: 0, lastGoodAt: 0 };
+    // 'pending', not 'error': Claude's first fetch is a real HTTP round trip,
+    // so the reducer's very first tick(s) read this before it resolves --
+    // seeding 'error' would render a spurious failure on every launch. The
+    // renderer has no case for 'pending' and falls through to a blank,
+    // neutral placeholder rather than an alarming one.
+    this._claude = { ...EMPTY_USAGE, status: 'pending', lastFetchedAt: 0, lastGoodAt: 0 };
+    this._codex = { ...EMPTY_USAGE, status: 'pending', lastFetchedAt: 0, lastGoodAt: 0 };
     this._claudeBackoffMs = HTTP_ERROR_BACKOFF_START_MS;
     this._pendingEdgeRefetch = null;
     this._inFlight = false;

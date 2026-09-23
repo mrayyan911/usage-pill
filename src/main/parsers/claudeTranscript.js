@@ -13,6 +13,8 @@
  *     waiting on the model for the next step -> WORKING.
  *   - `user` records with a plain `text` block and no `isMeta` flag mean a
  *     prompt was just submitted and hasn't been answered yet -> WORKING.
+ *     `message.content` can be either an array of blocks or, for a typed
+ *     prompt with no attachments, a bare string -- both mean the same thing.
  *   - A family of sidecar record types carry NO `timestamp` and are written
  *     at the *end* of a turn (last-prompt, ai-title, mode, permission-mode,
  *     atis-latch, file-history-snapshot, queue-operation, system, and the
@@ -75,6 +77,8 @@ function parseClaudeActivity(text) {
         if (!record.isMeta && content.some((c) => c && c.type === 'text')) {
           return 'working';
         }
+      } else if (typeof content === 'string' && content && !record.isMeta) {
+        return 'working';
       }
       continue;
     }
