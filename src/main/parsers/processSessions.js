@@ -9,14 +9,15 @@ const VALUE_OPTIONS = {
   codex: new Set('-c --config --enable --disable --remote --remote-auth-token-env -i --image -m --model --local-provider -p --profile -s --sandbox -C --cd --add-dir -a --ask-for-approval -o --output-last-message --output-schema'.split(' ')),
 };
 // Claude Desktop ships its own claude executable (Windows MSIX under
-// WindowsApps, or a per-user AnthropicClaude install; a bundled macOS app
-// under /Applications) that is indistinguishable from the CLI by name/args
-// alone. The Windows markers are confirmed against a real machine where
-// Desktop's main and renderer processes were all misclassified as CLI
-// sessions; the macOS marker is a best-effort guess pending the same
-// real-install verification. No Linux marker yet — add one if/when Claude
-// Desktop ships there rather than guessing a path.
-const DESKTOP_APP_PATH_MARKERS = ['\\windowsapps\\', '\\anthropicclaude\\', '/applications/claude.app/'];
+// WindowsApps, or a per-user AnthropicClaude install) that is
+// indistinguishable from the CLI by name/args alone. These markers are
+// confirmed against a real machine where Desktop's main and renderer
+// processes were all misclassified as CLI sessions. No macOS/Linux markers
+// yet — verify the actual install path against a real Claude Desktop
+// install on those platforms before adding one; a guessed path is worse
+// than no marker (it ships as false confidence that Desktop is excluded,
+// when in fact any wrong guess is silently a no-op).
+const DESKTOP_APP_PATH_MARKERS = ['\\windowsapps\\', '\\anthropicclaude\\'];
 
 function stripExeExt(name) {
   const lower = name.toLowerCase();
@@ -51,6 +52,13 @@ function classifyProcess(row) {
     else return null;
     args = args.slice(1);
   } else if (stripExeExt(basenameOf(argv[0] || '')) !== bareName) {
+    // Meaningful on Windows (row.name comes from CIM, independent of argv)
+    // and Linux (row.name comes from /proc's kernel-tracked comm field).
+    // On macOS row.name is currently derived from argv[0] itself by
+    // macProcesses.js, so this comparison is a no-op there — a real gap,
+    // not a design choice; closing it would need ps's separate `comm`
+    // column, whose exact output shape isn't verified against real macOS
+    // hardware yet, so it isn't guessed at here.
     return null;
   }
 

@@ -19,9 +19,13 @@ test('parseProcEntry splits NUL-separated cmdline into exact argv, preserving em
   assert.deepEqual(row.argv, ['codex', 'exec', 'Explain --help']);
 });
 
-test('parseProcEntry derives name from the basename of argv[0]', () => {
-  const cmdlineBuffer = Buffer.from('/usr/local/bin/codex\0exec\0', 'utf8');
-  const row = parseProcEntry({ pid: 103, cmdlineBuffer, statText: fakeStat({ pid: 103 }), bootTimeEpochSeconds: 1_700_000_000 });
+test('parseProcEntry derives name from the kernel-tracked stat comm field, not from argv[0]', () => {
+  // A process cannot make itself look like "codex" just by choosing what
+  // argv[0] says — comm is reported independently by the kernel, mirroring
+  // how the Windows provider's `name` comes from CIM rather than the
+  // process's own command line.
+  const cmdlineBuffer = Buffer.from('/usr/local/bin/some-other-binary\0exec\0', 'utf8');
+  const row = parseProcEntry({ pid: 103, cmdlineBuffer, statText: fakeStat({ pid: 103, comm: 'codex' }), bootTimeEpochSeconds: 1_700_000_000 });
   assert.equal(row.name, 'codex');
 });
 

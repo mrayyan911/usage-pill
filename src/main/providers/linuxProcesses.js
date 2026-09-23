@@ -8,10 +8,6 @@ const fs = require('node:fs/promises');
 // essentially never differs in practice.
 const CLOCK_TICKS_PER_SEC = 100;
 
-function basenamePosix(p) {
-  return (p || '').split('/').filter(Boolean).pop() || '';
-}
-
 // /proc/<pid>/cmdline is NUL-separated argv, ending in a trailing NUL. Only
 // the one trailing separator is dropped, not every empty run, so a
 // legitimate empty-string argument in the middle of argv survives.
@@ -22,11 +18,18 @@ function splitNulSeparated(buffer) {
 }
 
 // /proc/<pid>/stat's second field (comm) is parenthesized and may itself
-// contain spaces or parens, so fields are only safely split after the LAST
+// contain spaces or parens, so it's only safely extracted using the LAST
 // ')' rather than by naive whitespace splitting from the start of the line.
+// comm is kernel-tracked independently of argv, so classifyProcess's
+// "does the reported name match what argv[0] claims" check (processSessions.js)
+// has a real independent value to compare against here — mirroring why
+// Windows sources `name` from CIM rather than from its own CommandLine.
 function parseStatFields(statText) {
-  const afterComm = statText.slice(statText.lastIndexOf(')') + 1).trim();
-  return afterComm.split(/\s+/);
+  const openParen = statText.indexOf('(');
+  const closeParen = statText.lastIndexOf(')');
+  const comm = statText.slice(openParen + 1, closeParen);
+  const afterComm = statText.slice(closeParen + 1).trim();
+  return { comm, fields: afterComm.split(/\s+/) };
 }
 
 // Pure: given one process's raw /proc reads, produce the normalized row
@@ -36,11 +39,11 @@ function parseStatFields(statText) {
 function parseProcEntry({ pid, cmdlineBuffer, statText, bootTimeEpochSeconds, clockTicksPerSec = CLOCK_TICKS_PER_SEC }) {
   const argv = splitNulSeparated(cmdlineBuffer);
   if (argv.length === 0) return null;
-  const fields = parseStatFields(statText);
+  const { comm, fields } = parseStatFields(statText);
   const parentPid = Number(fields[1]); // stat field 4 (ppid) = fields[1] after the comm split
   const starttimeTicks = Number(fields[19]); // stat field 22 (starttime) = fields[19]
   const createdAt = new Date((bootTimeEpochSeconds + starttimeTicks / clockTicksPerSec) * 1000).toISOString();
-  return { name: basenamePosix(argv[0]), pid, parentPid, createdAt, argv };
+  return { name: comm, pid, parentPid, createdAt, argv };
 }
 
 async function readBootTimeEpochSeconds() {
@@ -70,8 +73,11 @@ async function readLinuxProcesses({ signal } = {}) {
       const row = parseProcEntry({ pid, cmdlineBuffer, statText, bootTimeEpochSeconds });
       if (row) rows.push(row);
     } catch {
-      // The process exited between readdir and these per-pid reads — normal
-      // churn, not a failed snapshot. Skip it, don't fail the whole read.
+      // Usually the process exiting between readdir and these per-pid
+      // reads — normal churn, not a failed snapshot. Also (deliberately)
+      // swallows a malformed /proc/<pid>/stat producing an unparseable
+      // row; dropping one unreadable process is a safe failure mode here,
+      // so it isn't worth distinguishing from the exit-race case.
     }
   }
   return rows;
