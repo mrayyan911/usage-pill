@@ -65,7 +65,7 @@ below).
 npm test
 ```
 
-130 unit tests cover the parsers (against scrubbed captured payload fixtures),
+143 unit tests cover the parsers (against scrubbed captured payload fixtures),
 the activity-log state machine, launch-position/drag-clamp/hover hit-test
 bounds math, saved-position load/save round-tripping, the activity store's
 sticky dual-agent selection and busy-agent handoff preference, the reducer
