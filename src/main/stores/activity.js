@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const { readTail, statOrNull } = require('../fsUtil');
 const { parseActivityLog } = require('../parsers/activityLog');
-const { readClaudeActivityFromTranscripts } = require('../providers/claudeActivity');
+const { listCandidateTranscripts, readClaudeActivityFromTranscripts } = require('../providers/claudeActivity');
 const { readCodexSnapshot } = require('../providers/codex');
 const { isProcessRunning } = require('../processCheck');
 
@@ -23,6 +23,12 @@ function activityLogPath() {
  * it distinguishes "blocked on a permission prompt" from "tool running",
  * which the transcript alone cannot. Fall back to transcript-tail scanning
  * for sessions that predate the hooks, or if hooks are disabled.
+ *
+ * The log outlives its hooks: once they're removed from settings.json it is
+ * never written again, and its final `session_end` would pin Claude to idle
+ * forever. So it only counts for the session it describes (transcripts are
+ * named <session_id>.jsonl) or when it's newer than the newest transcript --
+ * the permission-prompt case, where the hook writes and the transcript doesn't.
  */
 function readClaudeState() {
   const logPath = activityLogPath();
@@ -34,8 +40,12 @@ function readClaudeState() {
     } catch {
       text = '';
     }
-    const { state, lastTs } = parseActivityLog(text);
-    if (lastTs != null) {
+    const { state, lastTs, lastSessionId } = parseActivityLog(text);
+    const newestTranscript = listCandidateTranscripts()[0];
+    const describesNewestSession = newestTranscript != null
+      && path.basename(newestTranscript.filePath, '.jsonl') === lastSessionId;
+    const newerThanTranscript = newestTranscript == null || logStat.mtimeMs >= newestTranscript.mtimeMs;
+    if (lastTs != null && (describesNewestSession || newerThanTranscript)) {
       return { state, mtimeMs: logStat.mtimeMs, source: 'hook' };
     }
   }
