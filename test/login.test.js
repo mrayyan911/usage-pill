@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { configureLogin } = require('../src/main/login');
 
-test('source setup registers the quoted checkout path and monitor mode, then verifies registration', () => {
+test('source setup registers the raw checkout path and monitor mode, then verifies registration', () => {
   let written;
   const app = {
     isPackaged: false,
@@ -18,6 +18,7 @@ test('source setup registers the quoted checkout path and monitor mode, then ver
   configureLogin(app, true, 'C:\\Electron\\electron.exe', 'win32');
   assert.equal(written.openAtLogin, true);
   assert.equal(written.name, 'UsagePill');
+  assert.deepEqual(written.args, ['D:\\My Projects\\usage-pill', '--monitor']);
   configureLogin(app, false, 'C:\\Electron\\electron.exe', 'win32');
   assert.equal(written.openAtLogin, false);
 });
