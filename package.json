@@ -1,6 +1,6 @@
 {
   "name": "@mrayyan911/usage-pill",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Minimal always-on-top desktop overlay showing real-time Claude Code / Codex usage",
   "main": "src/main/index.js",
   "bin": {
