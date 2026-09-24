@@ -20,6 +20,10 @@ test('monitor subcommand maps to --monitor', () => {
   assert.deepEqual(resolveSubcommandArgs('monitor'), ['--monitor']);
 });
 
+test('uninstall subcommand maps to --uninstall', () => {
+  assert.deepEqual(resolveSubcommandArgs('uninstall'), ['--uninstall']);
+});
+
 test('unrecognized subcommand throws a clear error naming it', () => {
   assert.throws(() => resolveSubcommandArgs('bogus'), /Unrecognized command "bogus"/);
 });

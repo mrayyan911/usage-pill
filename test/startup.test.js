@@ -10,7 +10,7 @@ const { VisibilityController } = require('../src/main/visibility');
 async function launch(argv = ['electron', '.','--monitor'], { loginError, platform = 'win32' } = {}) {
   const app = new EventEmitter();
   let exitCode;
-  Object.assign(app, { commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => Promise.resolve(), quit() { app.emit('before-quit'); }, exit(code) { exitCode = code; } });
+  Object.assign(app, { commandLine: { appendSwitch() {} }, requestSingleInstanceLock: () => true, whenReady: () => Promise.resolve(), quit() { quitCount += 1; app.emit('before-quit'); }, exit(code) { exitCode = code; } });
   const win = new EventEmitter();
   let visible = false;
   let focused = false;
@@ -22,6 +22,8 @@ async function launch(argv = ['electron', '.','--monitor'], { loginError, platfo
   let stopped = false;
   let controller;
   let setup;
+  let dataRemoved = false;
+  let quitCount = 0;
   let inspect;
   const modules = {
     electron: { app },
@@ -41,13 +43,14 @@ async function launch(argv = ['electron', '.','--monitor'], { loginError, platfo
     './visibility': { VisibilityController },
     './tray': { createTray: (value, _quit, inspectCallback) => { controller = value; inspect = inspectCallback; return { update() {}, destroy() {} }; } },
     './login': { configureLogin: (_app, enabled) => { setup = enabled; if (loginError) throw loginError; } },
+    './appData': { removeAppData: () => { dataRemoved = true; } },
   };
   vm.runInNewContext(fs.readFileSync(require.resolve('../src/main/index'), 'utf8'), {
     require: name => { if (name.startsWith('node:')) return require(name); if (modules[name]) return modules[name]; throw new Error(`Unexpected import ${name}`); },
     process: { argv, env: {}, platform, exitCode: 0 }, console: { ...console, error() {} },
   });
   await new Promise(resolve => setImmediate(resolve));
-  return { app, win, messages, get visible() { return visible; }, get focused() { return focused; }, destroy() { destroyed = true; }, get running() { return driverRunning; }, get stopped() { return stopped; }, get setup() { return setup; }, get controller() { return controller; }, get exitCode() { return exitCode; }, inspect: () => inspect(), sessions: agents => updateSessions({ agents, status: 'ok' }) };
+  return { app, win, messages, get visible() { return visible; }, get focused() { return focused; }, destroy() { destroyed = true; }, get running() { return driverRunning; }, get stopped() { return stopped; }, get setup() { return setup; }, get controller() { return controller; }, get exitCode() { return exitCode; }, get dataRemoved() { return dataRemoved; }, get quitCount() { return quitCount; }, inspect: () => inspect(), sessions: agents => updateSessions({ agents, status: 'ok' }) };
 }
 
 test('monitor stays hidden until ready and a session opens; last exit stops activity polling', async () => {
@@ -91,6 +94,28 @@ test('setup removal configures login without starting a monitor', async () => {
   assert.equal(runtime.setup, false);
   assert.equal(runtime.controller, undefined);
   assert.equal(runtime.exitCode, 0);
+});
+
+test('uninstall removes the login item and app data without starting a monitor', async () => {
+  const runtime = await launch(['electron', '.', '--uninstall']);
+  assert.equal(runtime.setup, false);
+  assert.equal(runtime.dataRemoved, true);
+  assert.equal(runtime.controller, undefined);
+  assert.equal(runtime.exitCode, 0);
+});
+
+test('a failed uninstall exits non-zero and leaves app data in place', async () => {
+  const runtime = await launch(['electron', '.', '--uninstall'], { loginError: new Error('Windows startup registration could not be verified') });
+  assert.equal(runtime.dataRemoved, false);
+  assert.equal(runtime.exitCode, 1);
+});
+
+test('a running monitor quits when an uninstall is launched', async () => {
+  const runtime = await launch();
+  runtime.win.emit('ready-to-show');
+  runtime.app.emit('second-instance', {}, ['electron', '.', '--uninstall']);
+  assert.equal(runtime.quitCount, 1);
+  assert.equal(runtime.stopped, true);
 });
 
 test('a failed setup exits non-zero instead of silently reporting success', async () => {
