@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/design/screenshots/compact-collapsed-two.png" alt="Usage Pill, collapsed, showing Claude and Codex both active" width="140">
+  <img src="docs/design/screenshots/pill-hover.gif" alt="Usage Pill collapsed to two agent icons, expanding in place into usage bars when the cursor hovers over it" width="300">
 </p>
 
 <h1 align="center">Usage Pill</h1>
