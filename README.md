@@ -54,11 +54,34 @@ Captured from a live-launched instance (`USAGE_PILL_MOCK=1`), not mockups.
 
 ```sh
 npm install -g @mrayyan911/usage-pill
-usage-pill              # real data, always visible (manual preview)
-usage-pill setup        # register a hidden monitor to launch at login
-usage-pill monitor      # run that monitor manually, without registering it
-usage-pill setup:remove # unregister it
+usage-pill setup
 ```
+
+That's it: `setup` registers a hidden monitor to launch at login and starts
+it right away, so the pill appears whenever a `claude` or `codex` session
+is open and hides when the last one closes.
+
+```sh
+usage-pill              # real data, always visible (manual preview)
+usage-pill monitor      # run the hidden monitor manually, without registering it
+usage-pill setup:remove # unregister it from login (keeps the package installed)
+```
+
+### Uninstall
+
+```sh
+usage-pill uninstall
+npm uninstall -g @mrayyan911/usage-pill
+```
+
+Run them **in that order**. `usage-pill uninstall` quits a running pill,
+removes its login startup entry, and deletes its local data
+(`activity.jsonl` and `position.json` under `%LOCALAPPDATA%\usage-pill` on
+Windows, `~/usage-pill` elsewhere). Removing the npm package first leaves
+the login entry behind pointing at a deleted binary, with no `usage-pill`
+command left to clean it up. If you added the Claude Code activity hook to
+`~/.claude/settings.json` by hand, remove those entries yourself; the
+uninstall command points this out when it finds them.
 
 ### Run from source
 
@@ -85,6 +108,7 @@ disappears when the last one closes.
 npm run setup         # register a hidden monitor to launch at login
 npm run monitor        # run that monitor manually, without registering it
 npm run setup:remove   # unregister it
+npm run remove         # quit, unregister, and delete local data (usage-pill uninstall)
 ```
 
 This registers a login item on Windows, macOS (a `~/Library/LaunchAgents`

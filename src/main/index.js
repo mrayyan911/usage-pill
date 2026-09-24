@@ -11,6 +11,7 @@ const { MockDriver } = require('./mock');
 const { VisibilityController } = require('./visibility');
 const { createTray } = require('./tray');
 const { configureLogin } = require('./login');
+const { removeAppData } = require('./appData');
 
 // Chromium throttles renderers on visibility, not focus, so an always-on-top
 // window that's never minimized/hidden already holds 60fps on Windows.
@@ -23,8 +24,16 @@ const mock = process.env.USAGE_PILL_MOCK === '1';
 let preview = mock || !process.argv.some(arg => arg === '--monitor' || arg === '--hidden');
 let controller;
 
+if (process.argv.includes('--uninstall')) {
+  // Requesting the lock is how a running monitor learns of the uninstall:
+  // it receives this argv via 'second-instance' and quits itself.
+  app.requestSingleInstanceLock();
+  app.whenReady().then(() => {
+    try { configureLogin(app, false); removeAppData(); app.exit(0); }
+    catch (error) { console.error(error.message); app.exit(1); }
+  });
 // Setup must also work while another instance owns the pill.
-if (process.argv.includes('--setup') || process.argv.includes('--remove-startup')) {
+} else if (process.argv.includes('--setup') || process.argv.includes('--remove-startup')) {
   app.whenReady().then(() => {
     // app.quit() + process.exitCode is silently ignored by Electron; app.exit()
     // is the only way to make manage-startup.js see a real failure exit code.
@@ -35,6 +44,7 @@ if (process.argv.includes('--setup') || process.argv.includes('--remove-startup'
   app.quit();
 } else {
   app.on('second-instance', (_event, argv) => {
+    if (argv.includes('--uninstall')) { app.quit(); return; }
     if (argv.some(arg => arg === '--monitor' || arg === '--hidden')) return;
     preview = true;
     controller?.showPreview();

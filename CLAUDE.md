@@ -22,6 +22,7 @@ npm start                    # real data (reads live Claude/Codex usage), always
 npm run monitor              # native-Windows automatic mode: hidden until a session opens
 npm run setup                # register the monitor to launch at Windows login
 npm run setup:remove         # unregister it
+npm run remove               # quit a running pill, unregister it, delete local app data
 ```
 
 `USAGE_PILL_DEBUG=1` (combine with either `npm start` variant) logs every pushed state change to the terminal as JSON — the fastest way to inspect what the reducer is doing without eyeballing the pill.
@@ -73,7 +74,7 @@ UsageStore (Claude/Codex)┘
 
 ### npm packaging
 
-The package installs globally (`npm install -g @mrayyan911/usage-pill`) via `package.json`'s `bin.usage-pill` pointing at `bin/usage-pill.js`, a thin shim (`#!/usr/bin/env node`) that resolves `require('electron')` to the platform Electron binary's path (the standard mechanism for npm-distributed Electron CLIs) and spawns it against the package root. `scripts/cliArgs.js`'s `resolveSubcommandArgs` is the single place mapping CLI subcommands (`setup`, `setup:remove`, `monitor`, or none) to the flags `index.js` parses (`--setup`, `--remove-startup`, `--monitor`) — shared between `bin/usage-pill.js` and `scripts/manage-startup.js` (the `npm run setup`/`setup:remove` entry point for a dev checkout) so the mapping exists in exactly one place. `electron` lives in `dependencies`, not `devDependencies` — a global install needs it physically present. No build step: `npm start` is unaffected.
+The package installs globally (`npm install -g @mrayyan911/usage-pill`) via `package.json`'s `bin.usage-pill` pointing at `bin/usage-pill.js`, a thin shim (`#!/usr/bin/env node`) that resolves `require('electron')` to the platform Electron binary's path (the standard mechanism for npm-distributed Electron CLIs) and spawns it against the package root. `scripts/cliArgs.js`'s `resolveSubcommandArgs` is the single place mapping CLI subcommands (`setup`, `setup:remove`, `monitor`, `uninstall`, or none) to the flags `index.js` parses (`--setup`, `--remove-startup`, `--monitor`, `--uninstall`), and `scripts/launcher.js`'s `runSubcommand` is the single place that spawns Electron for them and does the follow-up (launching the detached monitor after `setup`, printing the finish-with-`npm uninstall` hint after `uninstall`). Both are shared between `bin/usage-pill.js` and `scripts/manage-startup.js` (the `npm run setup`/`setup:remove`/`remove` entry point for a dev checkout). `--uninstall` requests the single-instance lock purely so a running pill receives its argv via `second-instance` and quits, then removes the login item and `appData.js`'s known files -- only `activity.jsonl`/`position.json`, never the whole folder, since off Windows it's `~/usage-pill`, which may be a user's checkout. The npm script is `remove`, not `uninstall`, because `uninstall` is a lifecycle script name under npm 6. `electron` lives in `dependencies`, not `devDependencies` — a global install needs it physically present. No build step: `npm start` is unaffected.
 
 ### Shared low-level helpers
 
