@@ -12,7 +12,9 @@ function loginArgs(app) {
 }
 
 function configureWindowsLogin(app, enabled, executable) {
-  const args = app.isPackaged ? ['--monitor'] : [`"${app.getAppPath()}"`, '--monitor'];
+  // setLoginItemSettings already quotes each arg; pre-quoting here produces a
+  // literal-quoted path Electron resolves against system32 at login.
+  const args = loginArgs(app);
   const settings = { name: 'UsagePill', path: executable, args, openAtLogin: enabled, enabled };
   app.setLoginItemSettings(settings);
   // getLoginItemSettings({path, args}).openAtLogin resolves identity by the
