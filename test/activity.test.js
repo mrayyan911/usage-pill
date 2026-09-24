@@ -13,10 +13,17 @@ function fixture() {
   const inputs = {
     claude: { state: 'idle', mtimeMs: null },
     codex: { activity: 'idle', newestMtimeMs: null },
+    hookLog: null,
   };
   const dependencies = {
-    '../fsUtil': { statOrNull: () => null },
-    '../providers/claudeActivity': { readClaudeActivityFromTranscripts: () => inputs.claude },
+    '../fsUtil': {
+      statOrNull: () => (inputs.hookLog ? { mtimeMs: inputs.hookLog.mtimeMs } : null),
+      readTail: () => inputs.hookLog.text,
+    },
+    '../providers/claudeActivity': {
+      readClaudeActivityFromTranscripts: () => inputs.claude,
+      listCandidateTranscripts: () => (inputs.claude.filePath ? [{ filePath: inputs.claude.filePath, mtimeMs: inputs.claude.mtimeMs }] : []),
+    },
     '../providers/codex': { readCodexSnapshot: () => inputs.codex },
     '../processCheck': { isProcessRunning: () => true },
   };
@@ -84,6 +91,33 @@ for (const primary of ['claude', 'codex']) {
     assert.equal(handedOff[primary], 'idle');
   });
 }
+
+function hookLine(ev, sessionId, ts) {
+  return `${JSON.stringify({ agent: 'claude', ev, ts, session_id: sessionId })}\n`;
+}
+
+test('activity: a leftover hook log from an old session never overrides a live transcript', () => {
+  const { inputs, store } = fixture();
+  inputs.hookLog = { mtimeMs: 100, text: hookLine('start', 'old-session', '2026-01-01T00:00:00.000Z') + hookLine('session_end', 'old-session', '2026-01-01T00:01:00.000Z') };
+  inputs.claude = { state: 'working', mtimeMs: 900, filePath: path.join('projects', 'p', 'live-session.jsonl') };
+  const snapshot = store.poll();
+  assert.equal(snapshot.claude, 'working');
+  assert.equal(snapshot.active, 'claude');
+});
+
+test('activity: the hook log still wins for its own session, where it alone can see a permission prompt', () => {
+  const { inputs, store } = fixture();
+  inputs.hookLog = { mtimeMs: 500, text: hookLine('start', 'live-session', '2026-01-01T00:00:00.000Z') + hookLine('blocked', 'live-session', '2026-01-01T00:00:05.000Z') };
+  inputs.claude = { state: 'working', mtimeMs: 900, filePath: path.join('projects', 'p', 'live-session.jsonl') };
+  assert.equal(store.poll().claude, 'blocked');
+});
+
+test('activity: a hook log written after the newest transcript is trusted even for another session', () => {
+  const { inputs, store } = fixture();
+  inputs.hookLog = { mtimeMs: 900, text: hookLine('blocked', 'other-session', '2026-01-01T00:00:05.000Z') };
+  inputs.claude = { state: 'working', mtimeMs: 500, filePath: path.join('projects', 'p', 'live-session.jsonl') };
+  assert.equal(store.poll().claude, 'blocked');
+});
 
 test('activity: losing both sources clears sticky selection before another agent appears', () => {
   const { inputs, store } = fixture();
