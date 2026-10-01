@@ -49,7 +49,8 @@ app.whenReady().then(async () => {
         }
       }
     }
-    for (const key of ['height', 'width']) assert.ok(Math.abs(frames.at(-1)[key] - end[key]) < 0.1, `${label}: final ${key}`);
+    for (const key of ['height', 'width']) assert.ok(Math.abs(frames.at(-1)[key] - end[key]) < 0.1,
+      `${label}: final ${key} was ${frames.at(-1)[key]}, expected ${end[key]}`);
   };
   try {
     const agent = {agent: 'claude', state: 'working', percent: 42, status: 'ok'};

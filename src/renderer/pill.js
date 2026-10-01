@@ -7,6 +7,12 @@
   const detailEl = document.getElementById('detail');
   const backEl = document.getElementById('backToAgents');
   const expandedCardEl = document.querySelector('.expanded-card');
+  // Intrinsic row heights and the growing animation differ from the maximum
+  // native window size; input must follow the pixels currently on screen.
+  new ResizeObserver(() => {
+    const { x, y, width, height } = pillEl.getBoundingClientRect();
+    window.usagePill.reportBounds({ x, y, width, height });
+  }).observe(pillEl);
 
   let lastState = null;
   // These three always travel together to decide whether the card is
@@ -60,7 +66,7 @@
   // statusNote/statusWord/the freshness-tag assignment separately.
   const STATUS_META = {
     unauthenticated: { note: 'sign in to Claude Code', word: 'sign in' },
-    stale: { note: 'connection lost — showing last known value', word: 'stale', freshnessLabel: 'stale' },
+    stale: { note: 'usage reading is out of date', word: 'stale', freshnessLabel: 'stale' },
     error: { note: 'temporarily unavailable', word: 'unavailable', freshnessLabel: 'unavailable' },
     'never-used': { note: 'no usage yet' },
   };

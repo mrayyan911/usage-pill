@@ -3,6 +3,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('usagePill', {
+  reportBounds(bounds) {
+    ipcRenderer.send('pill:bounds', bounds);
+  },
   setExpanded(expanded) {
     ipcRenderer.send('pill:expanded', expanded === true);
   },

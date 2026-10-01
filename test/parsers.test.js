@@ -7,6 +7,7 @@ const path = require('node:path');
 
 const { parseClaudeActivity, IGNORED_TYPES } = require('../src/main/parsers/claudeTranscript');
 const { parseCodexRollout } = require('../src/main/parsers/codexRollout');
+const { parseActivityLog } = require('../src/main/parsers/activityLog');
 const { classifyProcess, readSessions } = require('../src/main/parsers/processSessions');
 const { normalizeWindowsRows, splitCommandLine } = require('../src/main/providers/windowsProcesses');
 const { parsePsOutput } = require('../src/main/providers/macProcesses');
@@ -22,6 +23,13 @@ test('captured Windows npm Codex tree identifies the CLI independently of its sh
 });
 
 const fixture = (name) => fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8');
+
+for (const event of ['end', 'session_end']) {
+  test(`activity log: ${event} clears an interrupted subagent even without subagent_stop`, () => {
+    const text = fixture('activity-log-interrupted-subagent.jsonl');
+    assert.equal(parseActivityLog(text.replace('"ev":"end"', `"ev":"${event}"`)).state, 'idle');
+  });
+}
 
 test('claude: last real record end_turn -> idle', () => {
   const state = parseClaudeActivity(fixture('claude-transcript.jsonl'));

@@ -4,7 +4,45 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { readCodexSnapshot } = require('../src/main/providers/codex');
+const { readCodexSnapshot: readSnapshot } = require('../src/main/providers/codex');
+const readCodexSnapshot = options => readSnapshot({ now: 1789373400000, ...options });
+
+test('expired Codex windows are unknown, never yesterday\'s percentage or an invented zero', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pill-codex-reset-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const file = path.join(dir, 'root.jsonl');
+  fs.writeFileSync(file, fs.readFileSync(path.join(__dirname, 'fixtures/codex-rollout-root.jsonl'), 'utf8'));
+  const snapshot = readCodexSnapshot({ files: [file], now: 1789977870000 });
+  assert.equal(snapshot.usage.percent, null);
+  assert.equal(snapshot.usage.weeklyPercent, null);
+  assert.equal(snapshot.usage.status, 'stale');
+});
+
+test('new root session without usage never inherits yesterday\'s expired percentage', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pill-codex-day-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const old = path.join(dir, 'old.jsonl');
+  const fresh = path.join(dir, 'fresh.jsonl');
+  const root = fs.readFileSync(path.join(__dirname, 'fixtures/codex-rollout-root.jsonl'), 'utf8');
+  fs.writeFileSync(old, root);
+  fs.writeFileSync(fresh, root.split('\n').filter(line => !line.includes('token_count')).join('\n'));
+  fs.utimesSync(old, 100, 100);
+  fs.utimesSync(fresh, 200, 200);
+  assert.equal(readCodexSnapshot({ files: [fresh, old] }).usage.percent, null);
+});
+
+test('a new root waiting for its first prompt never inherits an older unfinished turn', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pill-codex-idle-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const old = path.join(dir, 'old.jsonl');
+  const fresh = path.join(dir, 'fresh.jsonl');
+  const root = fs.readFileSync(path.join(__dirname, 'fixtures/codex-rollout-root.jsonl'), 'utf8');
+  fs.writeFileSync(old, root);
+  fs.writeFileSync(fresh, root.split('\n')[0] + '\n');
+  fs.utimesSync(old, 100, 100);
+  fs.utimesSync(fresh, 200, 200);
+  assert.equal(readCodexSnapshot({ files: [fresh, old] }).activity, 'idle');
+});
 
 test('large root rollout retains identity and turn state behind the tail; completed guardian cannot mask it', t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pill-codex-'));

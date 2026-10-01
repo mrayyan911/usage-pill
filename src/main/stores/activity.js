@@ -1,6 +1,5 @@
 'use strict';
 
-const fs = require('node:fs');
 const path = require('node:path');
 
 const { readTail, statOrNull } = require('../fsUtil');
@@ -46,6 +45,10 @@ function readClaudeState() {
       && path.basename(newestTranscript.filePath, '.jsonl') === lastSessionId;
     const newerThanTranscript = newestTranscript == null || logStat.mtimeMs >= newestTranscript.mtimeMs;
     if (lastTs != null && (describesNewestSession || newerThanTranscript)) {
+      if (state === 'working' && describesNewestSession && !newerThanTranscript) {
+        const transcript = readClaudeActivityFromTranscripts();
+        if (transcript.state === 'idle') return { ...transcript, source: 'transcript' };
+      }
       return { state, mtimeMs: logStat.mtimeMs, source: 'hook' };
     }
   }
@@ -74,24 +77,31 @@ function readCodexState() {
  * process is forced to idle) without re-probing on every 400ms tick.
  */
 class ActivityStore {
-  constructor() {
-    this._workingSince = { claude: null, codex: null }; // ms epoch, first tick we saw 'working'/'blocked' at this mtime
+  constructor({ sessionStore } = {}) {
+    this._sessionStore = sessionStore;
+    this._workingSince = { claude: null, codex: null }; // source-write time, including files already stale at launch
     this._lastMtimeSeen = { claude: null, codex: null };
     this._lastProcessProbe = { claude: 0, codex: 0 };
     this._lastKnownState = { claude: 'idle', codex: 'idle' };
+    this._lastRawState = { claude: 'idle', codex: 'idle' };
     this._stickyActive = null; // 'claude' | 'codex' | null -- see poll()
   }
 
   _arbitrate(agent, raw, imageNames) {
     const now = Date.now();
     const { state, mtimeMs } = raw;
+    // SessionStore already checks actual CLI processes on every platform.
+    if (this._sessionStore) return state;
+    if (state !== this._lastRawState[agent]) {
+      this._lastKnownState[agent] = state;
+      this._lastRawState[agent] = state;
+    }
 
     if (mtimeMs != null && mtimeMs !== this._lastMtimeSeen[agent]) {
       // Fresh write: reset the staleness clock, trust the raw state.
       this._lastMtimeSeen[agent] = mtimeMs;
-      this._workingSince[agent] = state === 'working' || state === 'blocked' ? now : null;
+      this._workingSince[agent] = state === 'working' || state === 'blocked' ? Math.min(now, mtimeMs) : null;
       this._lastKnownState[agent] = state;
-      return state;
     }
 
     // No change since last tick. If we're not in a busy state, nothing to arbitrate.
@@ -111,24 +121,35 @@ class ActivityStore {
     // rate-limited, whether the process is even still around.
     if (now - this._lastProcessProbe[agent] >= PROCESS_PROBE_MIN_INTERVAL_MS) {
       this._lastProcessProbe[agent] = now;
-      const alive = imageNames.some((name) => isProcessRunning(name) === true);
-      if (!alive) {
+      const results = imageNames.map(name => isProcessRunning(name));
+      if (results.every(alive => alive === false)) {
         this._lastKnownState[agent] = 'idle';
         return 'idle';
       }
+      this._lastKnownState[agent] = state;
     }
     // Process check inconclusive or still alive: keep reporting the busy
     // state rather than flicker, but don't reset the staleness clock.
-    this._lastKnownState[agent] = state;
-    return state;
+    return this._lastKnownState[agent];
+  }
+
+  _currentSessionReading(agent, raw) {
+    if (!this._sessionStore) return raw;
+    const sessions = this._sessionStore.getSessions().filter(session => session.agent === agent);
+    const starts = sessions.map(session => Date.parse(session.createdAt)).filter(Number.isFinite);
+    // Resumed transcripts are trustworthy again as soon as the new CLI writes.
+    if (!sessions.length || (starts.length && (raw.mtimeMs ?? -Infinity) < Math.min(...starts))) {
+      return { ...raw, state: 'idle', mtimeMs: null };
+    }
+    return raw;
   }
 
   /**
    * @returns {{active:'claude'|'codex'|null, state:'working'|'blocked'|'idle'}}
    */
   poll() {
-    const claudeRaw = readClaudeState();
-    const codexRaw = readCodexState();
+    const claudeRaw = this._currentSessionReading('claude', readClaudeState());
+    const codexRaw = this._currentSessionReading('codex', readCodexState());
 
     const claudeState = this._arbitrate('claude', claudeRaw, ['claude.exe', 'node.exe']);
     const codexState = this._arbitrate('codex', codexRaw, ['codex.exe']);

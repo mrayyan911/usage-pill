@@ -95,6 +95,7 @@ async function fetchClaudeUsage() {
     percent: typeof fiveHour.utilization === 'number' ? fiveHour.utilization : null,
     resetsAt: fiveHour.resets_at ? new Date(fiveHour.resets_at) : null,
     weeklyPercent: typeof sevenDay.utilization === 'number' ? sevenDay.utilization : null,
+    weeklyResetsAt: sevenDay.resets_at ? new Date(sevenDay.resets_at) : null,
     planType: null, // Claude's /usage payload doesn't carry plan tier; profile endpoint would.
     status: 'ok',
   };

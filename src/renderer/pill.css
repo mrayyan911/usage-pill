@@ -113,6 +113,9 @@ body {
   opacity: 0;
 }
 
+/* Clipping the collapsed row doesn't remove its native Windows drag region. */
+.pill.expanded .collapsed-icons { -webkit-app-region: no-drag; }
+
 .agent-icon {
   position: relative;
   display: inline-flex;
@@ -208,7 +211,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
   cursor: grab;
 }
 
@@ -217,12 +220,22 @@ body {
 }
 
 .agent-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 0.24s ease 0.08s, transform 0.32s var(--spring) 0.08s;
+}
+
+/* Native drag hit tests ignore overflow clipping and shimmer transforms. */
+.agent-row::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 28px;
+  -webkit-app-region: drag;
+  pointer-events: none;
 }
 
 [hidden] { display: none; }

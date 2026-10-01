@@ -8,4 +8,14 @@
  */
 const EMPTY_USAGE = { percent: null, resetsAt: null, weeklyPercent: null, planType: null };
 
-module.exports = { EMPTY_USAGE };
+function currentUsage(usage, now) {
+  const expired = usage.resetsAt != null && new Date(usage.resetsAt).getTime() <= now;
+  const weeklyExpired = usage.weeklyResetsAt != null && new Date(usage.weeklyResetsAt).getTime() <= now;
+  return {
+    ...usage,
+    ...(expired ? { percent: null, resetsAt: null, status: 'stale' } : {}),
+    ...(weeklyExpired ? { weeklyPercent: null, weeklyResetsAt: null } : {}),
+  };
+}
+
+module.exports = { EMPTY_USAGE, currentUsage };
