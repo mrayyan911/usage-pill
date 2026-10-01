@@ -4,7 +4,7 @@
   "description": "Minimal always-on-top desktop overlay showing real-time Claude Code / Codex usage",
   "main": "src/main/index.js",
   "bin": {
-    "usage-pill": "./bin/usage-pill.js"
+    "usage-pill": "bin/usage-pill.js"
   },
   "files": [
     "bin",
