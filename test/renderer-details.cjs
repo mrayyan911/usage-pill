@@ -86,6 +86,10 @@ app.whenReady().then(async () => {
     assert.equal(await evaluate("document.querySelector('.percent').textContent"), '—');
     assert.equal(await evaluate("document.querySelector('.percent').classList.contains('percent-status')"), false);
     assert.equal(await evaluate("document.getElementById('detail').textContent"), '');
+    win.webContents.send('pill:state', { agents: [{ agent: 'codex', state: 'idle', status: 'stale', percent: null }] });
+    await settle();
+    assert.doesNotMatch(await evaluate("document.getElementById('detail').textContent"), /connection lost|last known value/i,
+      'an expired local reading must not claim a network failure or a retained value');
     // A live state update (e.g. a usage percent tick) must not steal focus
     // away from a visible, still-focused non-badge control (Back, or the
     // scrollable detail text) -- regression: an earlier fix conflated

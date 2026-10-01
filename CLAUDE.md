@@ -17,6 +17,8 @@ Keep the surface almost black, its boundary barely visible, icons optically bala
 ```
 npm install
 npm test                     # runs the files listed in package.json's "test" script
+npm run test:renderer        # isolated Electron animation and inspection regressions
+npm run test:native          # Windows desktop click-through/drag regression (moves cursor)
 USAGE_PILL_MOCK=1 npm start  # scripted demo of every state/threshold, no real usage needed
 npm start                    # real data (reads live Claude/Codex usage), always visible
 npm run monitor              # native-Windows automatic mode: hidden until a session opens
@@ -50,6 +52,10 @@ UsageStore (Claude/Codex)┘
 
 ### Two independent activity/usage detection paths
 
+`ActivityStore` receives the shared `SessionStore` in the running app. It rejects activity files older than the oldest live CLI process for that agent and reports idle until a process has been identified. Failed process polls retain the last identified sessions; they do not bypass this check. Standalone activity stores retain the rate-limited process probe, with file age measured from its write time rather than app launch.
+
+Codex reads usage and initial idle activity from the newest root rollout. A new root without rate limits or a turn never borrows them from an older rollout. Usage sample timestamps govern freshness; repeatedly polling an unchanged file cannot make its reading fresh. Both providers retain weekly reset times internally, and `currentUsage()` clears percentages once their corresponding reset has passed. An unknown post-reset value is never fabricated as zero.
+
 **Claude:**
 - Primary signal: `hooks/activity-hook.js` (installed into `~/.claude/settings.json`, see README's "How activity detection works") appends one line per hook event to an append-only `activity.jsonl` under `%LOCALAPPDATA%/usage-pill/`. `parsers/activityLog.js` replays it as a small state machine (`start`/`subagent_start`/`subagent_stop`/`blocked`/`end`/`session_end`) that distinguishes "blocked on a permission prompt" from "tool running" — something a transcript alone can't. Hook changes only apply from the *next* Claude Code session onward.
 - Fallback (pre-hook sessions, or hooks disabled): `providers/claudeActivity.js` tails the newest `.jsonl` per project dir under `~/.claude/projects/`, and `parsers/claudeTranscript.js` walks it backward interpreting `stop_reason`/`tool_result`/sidecar-record rules (see the doc comment in that file — it encodes several non-obvious "ground truth verified against real transcripts" facts, e.g. a family of sidecar record types carry no `timestamp` and must be ignored entirely).
@@ -82,6 +88,8 @@ The package installs globally (`npm install -g @mrayyan911/usage-pill`) via `pac
 - `usageShape.js`: the shared `EMPTY_USAGE` shape (`{percent, resetsAt, weeklyPercent, planType}` all null) both providers and the usage store spread into their status-specific returns — reuse it rather than hand-copying the literal.
 
 ### Renderer (`src/renderer/`, `src/preload.js`)
+
+The renderer reports its current pill rectangle over `pill:bounds` using `ResizeObserver`. Placement validates that rectangle against the native window and uses it for hover and mouse pass-through, including during the size transition. Geometry defaults remain the drag-clamp policy. Expanded drag input uses a fixed `.agent-row::after` handle beside the badge; moving shimmer children must not inherit native drag regions, which ignore their overflow clipping on Windows.
 
 No framework, no build step. `preload.js` is the *only* bridge between main and renderer (`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`), exposing `window.usagePill.onState`/`onHover`/`onInspect`/`setExpanded`. `pill.js` renders `state.agents` (1 or 2 entries) into a collapsed icon strip and an expanded card of one row per agent, using a keyed reconciliation (`reorderByKey`) that reuses a DOM node as long as its agent is still shown -- reordering two still-shown agents moves the existing nodes via `insertBefore` instead of recreating them. This matters because `active` (the order/primary signal from `ActivityStore.poll()`, see below) is only sticky, not fully stable, so a purely position-keyed diff would periodically rebuild both rows and restart their CSS animations (badge pulse, shimmer sweep) while both agents are simultaneously busy. Each agent badge is a button: clicking (or, via the tray's Show usage details entry, keyboard focus) selects that agent's detail line within the existing card bound, with a `← Back` control to return to the two-agent view; Escape or losing window focus closes inspection. `setExpanded` reports the renderer's actual expansion state back to `placement.js` over the `pill:expanded` IPC channel so native drag-clamp bounds follow keyboard-driven expansion, not just pointer hover. Per-row color is a `--row-color` CSS custom property write (`pill.js`, one per `.agent-row`) consumed declaratively by `pill.css` for the bar-fill, with `.bar-fill.amber`/`.red` classes overriding it above threshold via specificity — don't reintroduce imperative `style.backgroundColor` branching here. `icons.js` inlines the real brand marks (mirrored from `assests/claude-code-color.svg` and `assests/codex-dark.svg`, kept in sync by hand) as SVG markup generated with unique paint-server IDs and restrained terracotta/satin-silver material shading, injected via `innerHTML` rather than `<img src>` so the CSP never needs to widen for a repo-root assets folder.
 

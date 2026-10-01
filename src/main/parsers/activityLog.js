@@ -17,7 +17,7 @@
  * depth. `subagent_start`/`subagent_stop` track nested work without
  * flipping the top-level state on their own -- while depth > 0 the agent
  * is working regardless of what the top-level state was. `end`,
- * `session_end` return to "idle" once depth has drained back to 0.
+ * `session_end` authoritatively end the turn, including interrupted subagents.
  * `blocked` (a permission prompt) is distinct from both: motion should
  * stop, but the turn hasn't ended.
  */
@@ -59,9 +59,8 @@ function parseActivityLog(text) {
         break;
       case 'end':
       case 'session_end':
-        if (depth === 0) state = 'idle';
-        // else: subagents still nested under this turn somehow -- keep
-        // "working" rather than snapping to idle under an inconsistent log.
+        state = 'idle';
+        depth = 0;
         break;
       default:
         break;

@@ -32,6 +32,8 @@ function attach(t, saved) {
     bounds: { ...context.placement.launchBounds },
     visible: true,
     destroyed: false,
+    ignoresMouse: false,
+    setIgnoreMouseEvents(ignore) { this.ignoresMouse = ignore; },
     messages: [],
     isDestroyed() { return this.destroyed; },
     isVisible() { return this.visible; },
@@ -101,6 +103,31 @@ function dragOffscreen(win) {
   win.setBounds({ x: -200, y: -100, width: 280, height: 102 });
   return win.getBounds().x;
 }
+
+test('collapsed transparent margins pass clicks through while the visible pill accepts input', t => {
+  const { win, screen } = attach(t);
+  screen.cursor = { x: win.bounds.x + 10, y: win.bounds.y + 60 };
+  t.mock.timers.tick(150);
+  assert.equal(win.ignoresMouse, true, 'invisible expanded-window margin must not block other apps');
+  screen.cursor = { x: win.bounds.x + 140, y: win.bounds.y + 20 };
+  t.mock.timers.tick(150);
+  assert.equal(win.ignoresMouse, false, 'visible pill must remain interactive');
+  screen.cursor = { x: -100, y: -100 };
+  t.mock.timers.tick(150);
+  assert.equal(win.ignoresMouse, true);
+});
+
+test('renderer dimensions keep the unused part of a one-row expanded card click-through', t => {
+  const { win, screen } = attach(t);
+  win.webContents.emit('ipc-message', {}, 'pill:expanded', true);
+  win.webContents.emit('ipc-message', {}, 'pill:bounds', { x: 16, y: 6, width: 248, height: 50 });
+  screen.cursor = { x: win.bounds.x + 140, y: win.bounds.y + 65 };
+  t.mock.timers.tick(150);
+  assert.equal(win.ignoresMouse, true);
+  assert.deepEqual(win.messages, [], 'transparent bottom margin must not count as hover');
+  win.webContents.emit('ipc-message', {}, 'pill:bounds', { x: 0, y: 0, width: Infinity, height: 102 });
+  assert.equal(win.ignoresMouse, true, 'invalid renderer bounds cannot consume input');
+});
 
 test('keyboard inspection uses expanded drag bounds even before a native hover', t => {
   const { win } = attach(t);

@@ -6,7 +6,7 @@ const fs = require('node:fs');
 
 const { statOrNull } = require('../fsUtil');
 const { parseCodexRollout } = require('../parsers/codexRollout');
-const { EMPTY_USAGE } = require('../usageShape');
+const { EMPTY_USAGE, currentUsage } = require('../usageShape');
 
 const SESSIONS_ROOT = path.join(os.homedir(), '.codex', 'sessions');
 const rolloutCache = new Map();
@@ -57,7 +57,7 @@ function readRollout(filePath) {
           if (p?.turn_id && ['task_started', 'task_complete'].includes(p.type)) {
             cached.turn = { type: 'event_msg', payload: { type: p.type, turn_id: p.turn_id } };
           } else if (p?.type === 'token_count' && p.rate_limits) {
-            cached.usage = { type: 'event_msg', payload: { type: p.type, rate_limits: p.rate_limits } };
+            cached.usage = { type: 'event_msg', timestamp: record.timestamp, payload: { type: p.type, rate_limits: p.rate_limits } };
           }
         }
       }
@@ -66,6 +66,7 @@ function readRollout(filePath) {
     rolloutCache.set(filePath, cached);
     const parsed = parseCodexRollout([cached.meta, cached.turn, cached.usage].filter(Boolean).map(r => JSON.stringify(r)).join('\n'));
     if (cached.turn?.payload.type === 'task_complete') parsed.activity = 'idle';
+    parsed.usageObservedAtMs = Date.parse(cached.usage?.timestamp) || stat.mtimeMs;
     return parsed;
   } finally { fs.closeSync(fd); }
 }
@@ -110,20 +111,19 @@ function allRolloutFilesToday() {
  * Incrementally scans today's and yesterday's rollout files, newest-first,
  * retaining thread identity, latest turn boundary, and latest usage.
  *
- * - Usage comes from the first user/root-thread file that carries
- *   rate_limits (subagent files are skipped for this purpose -- their
- *   rate_limits are stale/partial snapshots).
+ * - Only the newest user/root thread supplies usage. An initial rollout
+ *   without rate_limits must not inherit an older session's percentage.
  * - The newest root's activity wins over completed subagents. A newer busy
  *   subagent still counts as working. Older abandoned threads cannot keep a
  *   completed root busy. The newest file mtime remains the freshness signal.
  *
  * @returns {{
- *   usage: {percent:number|null, resetsAt:Date|null, weeklyPercent:number|null, planType:string|null, status:'ok'|'error'},
+ *   usage: {percent:number|null, resetsAt:Date|null, weeklyPercent:number|null, planType:string|null, status:'ok'|'stale'|'error'},
  *   activity: 'working'|'idle'|'unknown',
  *   newestMtimeMs: number|null
  * }}
  */
-function readCodexSnapshot({ files: candidates = allRolloutFilesToday() } = {}) {
+function readCodexSnapshot({ files: candidates = allRolloutFilesToday(), now = Date.now() } = {}) {
   const present = new Set(candidates);
   for (const file of rolloutCache.keys()) if (!present.has(file)) rolloutCache.delete(file);
   const files = candidates
@@ -136,6 +136,7 @@ function readCodexSnapshot({ files: candidates = allRolloutFilesToday() } = {}) 
   let newestMtimeMs = files.length > 0 ? files[0].mtimeMs : null;
   let usageFound = false;
   let activityFound = false;
+  let usageObservedAtMs = null;
 
   for (const { filePath } of files) {
     let parsed;
@@ -146,28 +147,35 @@ function readCodexSnapshot({ files: candidates = allRolloutFilesToday() } = {}) 
     }
     const { isUserThread, rateLimits, activity: fileActivity } = parsed;
 
-    if (!usageFound && isUserThread && rateLimits) {
-      const primary = rateLimits.primary || {};
-      const secondary = rateLimits.secondary || {};
-      usage = {
-        percent: typeof primary.used_percent === 'number' ? primary.used_percent : null,
-        resetsAt: primary.resets_at ? new Date(primary.resets_at * 1000) : null,
-        weeklyPercent: typeof secondary.used_percent === 'number' ? secondary.used_percent : null,
-        planType: rateLimits.plan_type || null,
-        status: 'ok',
-      };
+    if (!usageFound && isUserThread) {
       usageFound = true;
+      if (rateLimits) {
+        const primary = rateLimits.primary || {};
+        const secondary = rateLimits.secondary || {};
+        usage = currentUsage({
+          percent: typeof primary.used_percent === 'number' ? primary.used_percent : null,
+          resetsAt: primary.resets_at ? new Date(primary.resets_at * 1000) : null,
+          weeklyPercent: typeof secondary.used_percent === 'number' ? secondary.used_percent : null,
+          weeklyResetsAt: secondary.resets_at ? new Date(secondary.resets_at * 1000) : null,
+          planType: rateLimits.plan_type || null,
+          status: 'ok',
+        }, now);
+        usageObservedAtMs = parsed.usageObservedAtMs;
+      }
     }
 
     if (!activityFound) {
       if (fileActivity === 'working' || (activity === 'unknown' && fileActivity !== 'unknown')) activity = fileActivity;
-      if (isUserThread && fileActivity !== 'unknown') activityFound = true;
+      if (isUserThread) {
+        activityFound = true;
+        if (activity === 'unknown') activity = 'idle';
+      }
     }
 
     if (usageFound && activityFound) break;
   }
 
-  return { usage, activity, newestMtimeMs, hasFiles: files.length > 0 };
+  return { usage, activity, newestMtimeMs, usageObservedAtMs, hasFiles: files.length > 0 };
 }
 
 module.exports = { readCodexSnapshot, candidateRolloutDirs, allRolloutFilesToday };

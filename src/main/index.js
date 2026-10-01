@@ -67,7 +67,7 @@ function main() {
   };
 
   const driver = mock ? new MockDriver({ onChange: send }) : new Reducer({
-    activityStore: new ActivityStore(), usageStore: new UsageStore(), sessionStore: sessions,
+    activityStore: new ActivityStore({ sessionStore: sessions }), usageStore: new UsageStore(), sessionStore: sessions,
     preview: () => controller.snapshot().preview, onChange: send,
   });
   controller = new VisibilityController({ preview, onChange: state => {

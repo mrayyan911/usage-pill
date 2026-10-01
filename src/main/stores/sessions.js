@@ -19,6 +19,10 @@ class SessionStore {
     return { agents: [...new Set(this._sessions.map(s => s.agent))], status: this._status };
   }
 
+  getSessions() {
+    return this._sessions.map(session => ({ ...session }));
+  }
+
   poll() {
     if (this._pending) return this._pending;
     this._abort = new AbortController();

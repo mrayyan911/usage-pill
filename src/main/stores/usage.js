@@ -2,7 +2,7 @@
 
 const { fetchClaudeUsage } = require('../providers/claude');
 const { readCodexSnapshot } = require('../providers/codex');
-const { EMPTY_USAGE } = require('../usageShape');
+const { EMPTY_USAGE, currentUsage } = require('../usageShape');
 
 const CLAUDE_POLL_MS = 60_000;
 const CLAUDE_EDGE_DEBOUNCE_MS = 5_000;
@@ -37,14 +37,14 @@ class UsageStore {
   refreshCodex() {
     const snapshot = readCodexSnapshot();
     const now = this._now();
-    if (snapshot.usage.status === 'ok') {
-      this._codex = { ...snapshot.usage, status: 'ok', lastFetchedAt: now, lastGoodAt: now };
-    } else if (this._codex.lastGoodAt === 0) {
-      // Never had a good reading (Codex never used, or no rate_limits yet) --
-      // reflect that plainly rather than a stale placeholder.
-      this._codex = { ...EMPTY_USAGE, status: snapshot.usage.status, lastFetchedAt: now, lastGoodAt: 0 };
+    if (snapshot.usage.status === 'ok' || snapshot.usage.status === 'stale') {
+      const observedAt = snapshot.usageObservedAtMs ?? now;
+      this._codex = { ...snapshot.usage,
+        status: snapshot.usage.status === 'stale' ? 'stale' : this._staleOrError(observedAt, now),
+        lastFetchedAt: now, lastGoodAt: observedAt };
     } else {
-      this._codex = { ...this._codex, status: this._staleOrError(this._codex.lastGoodAt, now) };
+      // No reading on the newest root must not inherit another session's cache.
+      this._codex = { ...EMPTY_USAGE, status: snapshot.usage.status, lastFetchedAt: now, lastGoodAt: 0 };
     }
     return this.getCodexUsage();
   }
@@ -98,12 +98,12 @@ class UsageStore {
   }
 
   getClaudeUsage() {
-    const { percent, resetsAt, weeklyPercent, planType, status } = this._claude;
+    const { percent, resetsAt, weeklyPercent, planType, status } = currentUsage(this._claude, this._now());
     return { agent: 'claude', percent, resetsAt, weeklyPercent, planType, status };
   }
 
   getCodexUsage() {
-    const { percent, resetsAt, weeklyPercent, planType, status } = this._codex;
+    const { percent, resetsAt, weeklyPercent, planType, status } = currentUsage(this._codex, this._now());
     return { agent: 'codex', percent, resetsAt, weeklyPercent, planType, status };
   }
 }

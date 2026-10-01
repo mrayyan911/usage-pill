@@ -35,11 +35,43 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
     let isDragging = false;
     let dragIdleTimer = null;
     let menuOpen = false;
+    let ignoresMouse = null;
+    let rendererRect = null;
+
+    const inputRect = () => {
+      const bounds = win.getBounds();
+      return rendererRect ? { ...rendererRect, x: bounds.x + rendererRect.x, y: bounds.y + rendererRect.y }
+        : ConfigStore.pillHitRect(bounds, { expanded: isExpanded });
+    };
+
+    const updateMouseInput = () => {
+      if (win.isDestroyed() || !win.isVisible() || isDragging || menuOpen) return;
+      const cursor = screen.getCursorScreenPoint();
+      const rect = inputRect();
+      const ignore = !(cursor.x >= rect.x && cursor.x <= rect.x + rect.width
+        && cursor.y >= rect.y && cursor.y <= rect.y + rect.height);
+      if (ignore === ignoresMouse) return;
+      ignoresMouse = ignore;
+      // A transparent pixel still captures input inside the pre-sized window.
+      win.setIgnoreMouseEvents(ignore, { forward: true });
+    };
 
     // Keyboard inspection can outlast pointer hover; native drag bounds must
     // follow the renderer's actual expansion, including Escape dismissal.
-    listen(win.webContents, 'ipc-message', (_event, channel, expanded) => {
-      if (channel === 'pill:expanded' && typeof expanded === 'boolean') isExpanded = expanded;
+    listen(win.webContents, 'ipc-message', (_event, channel, value) => {
+      if (channel === 'pill:expanded' && typeof value === 'boolean') {
+        isExpanded = value;
+        updateMouseInput();
+      }
+      if (channel === 'pill:bounds' && value && typeof value === 'object') {
+        const { x, y, width, height } = value;
+        const bounds = win.getBounds();
+        if ([x, y, width, height].every(Number.isFinite) && x >= 0 && y >= 0 && width > 0 && height > 0
+          && x + width <= bounds.width && y + height <= bounds.height) {
+          rendererRect = { x, y, width, height };
+          updateMouseInput();
+        }
+      }
     });
 
     const restoreDefaultPosition = () => {
@@ -187,7 +219,7 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
       if (win.isDestroyed() || !win.isVisible()) return;
       if (isDragging || menuOpen) return;
       const cursor = screen.getCursorScreenPoint();
-      const b = ConfigStore.pillHitRect(win.getBounds(), { expanded: isExpanded });
+      const b = inputRect();
       const isHovering = cursor.x >= b.x && cursor.x <= b.x + b.width && cursor.y >= b.y && cursor.y <= b.y + b.height;
       if (isHovering !== wasHovering) {
         wasHovering = isHovering;
@@ -201,7 +233,10 @@ function createPillPlacement({ screen, positions = PositionStore, timers = globa
         isExpanded = isHovering;
         if (!win.isDestroyed()) win.webContents.send('pill:hover', isHovering);
       }
+      updateMouseInput();
     }, HOVER_POLL_MS);
+    listen(win, 'show', updateMouseInput);
+    updateMouseInput();
     win.once('closed', () => {
       timers.clearTimeout(dragIdleTimer);
       timers.clearInterval(hoverTimer);
