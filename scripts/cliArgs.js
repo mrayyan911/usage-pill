@@ -6,7 +6,8 @@ function resolveSubcommandArgs(subcommand) {
   if (subcommand === 'setup:remove') return ['--remove-startup'];
   if (subcommand === 'monitor') return ['--monitor'];
   if (subcommand === 'uninstall') return ['--uninstall'];
-  throw new Error(`Unrecognized command "${subcommand}". Use one of: setup, setup:remove, monitor, uninstall.`);
+  if (subcommand === 'upgrade') return ['--quit'];
+  throw new Error(`Unrecognized command "${subcommand}". Use one of: setup, setup:remove, monitor, upgrade, uninstall.`);
 }
 
 module.exports = { resolveSubcommandArgs };
