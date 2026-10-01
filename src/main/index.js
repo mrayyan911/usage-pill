@@ -12,6 +12,10 @@ const { VisibilityController } = require('./visibility');
 const { createTray } = require('./tray');
 const { configureLogin } = require('./login');
 const { removeAppData } = require('./appData');
+const quitResult = require('./quitResult');
+
+const QUIT_TIMEOUT_MS = 10_000;
+const QUIT_POLL_MS = 200;
 
 // Chromium throttles renderers on visibility, not focus, so an always-on-top
 // window that's never minimized/hidden already holds 60fps on Windows.
@@ -32,6 +36,19 @@ if (process.argv.includes('--uninstall')) {
     try { configureLogin(app, false); removeAppData(); app.exit(0); }
     catch (error) { console.error(error.message); app.exit(1); }
   });
+} else if (process.argv.includes('--quit')) {
+  // A failed lock request delivers --quit to the running pill. The lock is
+  // only released once that pill shuts down, so winning it later is the
+  // signal that its files are no longer held open.
+  app.whenReady().then(async () => {
+    if (app.requestSingleInstanceLock()) { app.exit(quitResult.NOT_RUNNING); return; }
+    const deadline = Date.now() + QUIT_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, QUIT_POLL_MS));
+      if (app.requestSingleInstanceLock()) { app.exit(quitResult.STOPPED); return; }
+    }
+    app.exit(quitResult.STILL_RUNNING);
+  });
 // Setup must also work while another instance owns the pill.
 } else if (process.argv.includes('--setup') || process.argv.includes('--remove-startup')) {
   app.whenReady().then(() => {
@@ -44,7 +61,7 @@ if (process.argv.includes('--uninstall')) {
   app.quit();
 } else {
   app.on('second-instance', (_event, argv) => {
-    if (argv.includes('--uninstall')) { app.quit(); return; }
+    if (argv.includes('--uninstall') || argv.includes('--quit')) { app.quit(); return; }
     if (argv.some(arg => arg === '--monitor' || arg === '--hidden')) return;
     preview = true;
     controller?.showPreview();

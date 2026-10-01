@@ -24,6 +24,10 @@ test('uninstall subcommand maps to --uninstall', () => {
   assert.deepEqual(resolveSubcommandArgs('uninstall'), ['--uninstall']);
 });
 
+test('upgrade subcommand first asks a running pill to quit', () => {
+  assert.deepEqual(resolveSubcommandArgs('upgrade'), ['--quit']);
+});
+
 test('unrecognized subcommand throws a clear error naming it', () => {
   assert.throws(() => resolveSubcommandArgs('bogus'), /Unrecognized command "bogus"/);
 });

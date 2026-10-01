@@ -68,6 +68,24 @@ usage-pill monitor      # run the hidden monitor manually, without registering i
 usage-pill setup:remove # unregister it from login (keeps the package installed)
 ```
 
+### Upgrade
+
+```sh
+usage-pill upgrade
+```
+
+`upgrade` checks npm for a newer version and, if there is one, closes the
+running pill, installs that version, and restarts the monitor if one was
+running. It changes nothing when you're already up to date or npm can't be
+reached. You don't need to run `setup` again afterwards: the login entry
+keeps pointing at the same install.
+
+A plain `npm install -g @mrayyan911/usage-pill` fails with `EBUSY` on
+Windows while the pill is running, because the running app holds its own
+files open. Versions before 1.1.3 don't have `upgrade` yet, so for that
+one upgrade, quit the pill from its tray menu first, then run the
+`npm install -g` command above.
+
 ### Uninstall
 
 ```sh
@@ -159,16 +177,18 @@ vocabulary.
 ## Testing
 
 ```sh
-npm test              # 176 unit tests — pure functions, no Electron runtime needed
-npm run test:renderer # 3 tests — real Electron animation/interaction regression
+npm test              # 192 unit tests — pure functions, no Electron runtime needed
+npm run test:renderer # 4 tests — real Electron animation/interaction/quit regression
 npm run test:native   # Windows only — real mouse click-through/hover/drag check (moves the cursor)
 ```
 
 `npm test` covers the parsers (against scrubbed captured payload fixtures),
 the activity-log state machine, drag/hover/placement math, the reducer
 (including the two-agents-busy-at-once case), Windows/macOS/Linux session
-detection and login-item registration, and the CLI subcommand→flag mapping
-shared by `bin/usage-pill.js` and `scripts/manage-startup.js`.
+detection and login-item registration, the CLI subcommand→flag mapping
+shared by `bin/usage-pill.js` and `scripts/manage-startup.js`, and every
+`upgrade` outcome (already current, offline, a pill that won't quit, a
+failed install).
 
 ## Status
 
