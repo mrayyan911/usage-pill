@@ -35,7 +35,8 @@ usage, and plan, or click an agent icon to inspect it directly.
   next launch.
 - **Meaningful state, not just a number.** A small **!** marks an agent
   waiting on a permission prompt; stale readings keep their last known
-  percentage with a separate freshness label instead of silently going dark.
+  percentage with a separate freshness label instead of silently going dark,
+  and a percentage clears once its limit window resets rather than lingering.
 - **Cross-platform automatic startup.** An optional hidden background
   monitor (Windows, macOS, Linux) that appears only while a `claude` or
   `codex` session is open and disappears when the last one closes.
@@ -158,8 +159,9 @@ vocabulary.
 ## Testing
 
 ```sh
-npm test              # 149 unit tests — pure functions, no Electron runtime needed
+npm test              # 176 unit tests — pure functions, no Electron runtime needed
 npm run test:renderer # 3 tests — real Electron animation/interaction regression
+npm run test:native   # Windows only — real mouse click-through/hover/drag check (moves the cursor)
 ```
 
 `npm test` covers the parsers (against scrubbed captured payload fixtures),
